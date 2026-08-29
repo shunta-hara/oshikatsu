@@ -255,6 +255,10 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("character varying(254)")
                         .HasColumnName("email");
 
+                    b.Property<DateTime?>("LastViewedFeedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_viewed_feed_at");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text")

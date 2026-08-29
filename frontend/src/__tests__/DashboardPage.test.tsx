@@ -18,6 +18,8 @@ const mockLogout = vi.mocked(authApi.logout);
 const mockGetOshis = vi.mocked(oshiApi.getOshis);
 const mockGetNews = vi.mocked(feedApi.getNews);
 const mockGetPrograms = vi.mocked(feedApi.getPrograms);
+const mockGetUnreadCount = vi.mocked(feedApi.getUnreadCount);
+const mockMarkAsRead = vi.mocked(feedApi.markAsRead);
 const mockGetCollectorStatus = vi.mocked(collectorApi.getCollectorStatus);
 
 const emptyNewsPage = {
@@ -68,6 +70,9 @@ describe("DashboardPage", () => {
       latestNewsJob: null,
       latestProgramJob: null,
     });
+    // デフォルトで未読件数 0、mark-as-read は成功
+    mockGetUnreadCount.mockResolvedValue(0);
+    mockMarkAsRead.mockResolvedValue(undefined);
   });
 
   // --- 正常系 ---
@@ -272,6 +277,56 @@ describe("DashboardPage", () => {
 
     await waitFor(() => {
       expect(screen.getAllByText("未実行")).toHaveLength(2);
+    });
+  });
+
+  // --- NotificationBadge ---
+  it("未読件数が1件以上のとき通知バッジが表示される", async () => {
+    mockGetUnreadCount.mockResolvedValue(3);
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("status", { name: "未読 3 件" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("未読件数が0件のとき通知バッジが表示されない", async () => {
+    mockGetUnreadCount.mockResolvedValue(0);
+
+    renderWithProvider();
+
+    // getUnreadCount の完了を待つ
+    await waitFor(() => {
+      expect(mockGetUnreadCount).toHaveBeenCalledOnce();
+    });
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("ページを開くと markAsRead が呼ばれる", async () => {
+    mockGetUnreadCount.mockResolvedValue(5);
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(mockMarkAsRead).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("markAsRead が呼ばれてもバッジの件数表示はページ滞在中は維持される", async () => {
+    mockGetUnreadCount.mockResolvedValue(5);
+    mockMarkAsRead.mockResolvedValue(undefined);
+
+    renderWithProvider();
+
+    // getUnreadCount で取得した件数はそのままバッジに残る（次回訪問で 0 になる設計）
+    await waitFor(() => {
+      expect(
+        screen.getByRole("status", { name: "未読 5 件" }),
+      ).toBeInTheDocument();
     });
   });
 });

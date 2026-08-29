@@ -16,4 +16,15 @@ public interface IFeedService
     /// oshiId が指定された場合はその推しの番組のみ返す。指定した oshiId がユーザーの推しでない場合は空を返す。
     /// </summary>
     Task<PaginatedResponseDto<ProgramAppearanceResponseDto>> GetProgramsAsync(int userId, int page, int pageSize, int? oshiId = null);
+
+    /// <summary>
+    /// ユーザーの前回閲覧日時以降に追加されたニュース・出演番組の合計件数を返す。
+    /// LastViewedFeedAt が null（未閲覧）の場合は 0 を返す。
+    /// </summary>
+    Task<int> GetUnreadCountAsync(int userId);
+
+    /// <summary>
+    /// ユーザーの LastViewedFeedAt を現在日時（UTC）に更新して未読件数をリセットする。
+    /// </summary>
+    Task MarkAsReadAsync(int userId);
 }

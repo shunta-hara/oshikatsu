@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
                   .IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            entity.Property(e => e.LastViewedFeedAt).HasColumnName("last_viewed_feed_at");
 
             entity.HasIndex(e => e.Email)
                   .IsUnique()

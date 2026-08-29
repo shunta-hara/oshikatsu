@@ -2,6 +2,7 @@ import { apiFetch } from "./client";
 import {
   newsPaginatedSchema,
   programsPaginatedSchema,
+  unreadCountSchema,
   type NewsPaginatedResponse,
   type ProgramsPaginatedResponse,
 } from "../types/feed";
@@ -32,4 +33,16 @@ export async function getPrograms(
   }
   const raw = await apiFetch<unknown>(url);
   return programsPaginatedSchema.parse(raw);
+}
+
+/** 前回閲覧以降に追加された未読件数（ニュース＋出演番組）を取得する */
+export async function getUnreadCount(): Promise<number> {
+  const raw = await apiFetch<unknown>("/feed/unread-count");
+  const parsed = unreadCountSchema.parse(raw);
+  return parsed.unreadCount;
+}
+
+/** フィード閲覧日時を現在日時に更新し、未読件数をリセットする */
+export async function markAsRead(): Promise<void> {
+  await apiFetch<void>("/feed/mark-as-read", { method: "POST" });
 }

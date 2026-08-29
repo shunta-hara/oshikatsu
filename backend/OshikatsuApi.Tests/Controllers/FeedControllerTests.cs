@@ -274,6 +274,77 @@ public class FeedControllerTests
         await _feedService.Received(1).GetProgramsAsync(1, 1, 20, null);
     }
 
+    // ── GET /api/v1/feed/unread-count: 正常系 ─────────────────────────────────
+
+    [Fact]
+    public async Task GetUnreadCount_AuthenticatedUser_Returns200()
+    {
+        _feedService.GetUnreadCountAsync(1).Returns(0);
+
+        var result = await _sut.GetUnreadCount();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetUnreadCount_WithUnreadItems_ReturnsCount()
+    {
+        _feedService.GetUnreadCountAsync(1).Returns(5);
+
+        var result = await _sut.GetUnreadCount();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<UnreadCountResponseDto>(ok.Value);
+        Assert.Equal(5, body.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetUnreadCount_NoUnreadItems_ReturnsZero()
+    {
+        _feedService.GetUnreadCountAsync(1).Returns(0);
+
+        var result = await _sut.GetUnreadCount();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<UnreadCountResponseDto>(ok.Value);
+        Assert.Equal(0, body.UnreadCount);
+    }
+
+    [Fact]
+    public async Task GetUnreadCount_CallsServiceWithCurrentUserId()
+    {
+        SetupAuthenticatedUser(userId: 42);
+        _feedService.GetUnreadCountAsync(42).Returns(3);
+
+        await _sut.GetUnreadCount();
+
+        await _feedService.Received(1).GetUnreadCountAsync(42);
+    }
+
+    // ── POST /api/v1/feed/mark-as-read: 正常系 ────────────────────────────────
+
+    [Fact]
+    public async Task MarkAsRead_AuthenticatedUser_Returns204()
+    {
+        _feedService.MarkAsReadAsync(1).Returns(Task.CompletedTask);
+
+        var result = await _sut.MarkAsRead();
+
+        Assert.IsType<NoContentResult>(result);
+    }
+
+    [Fact]
+    public async Task MarkAsRead_CallsServiceWithCurrentUserId()
+    {
+        SetupAuthenticatedUser(userId: 7);
+        _feedService.MarkAsReadAsync(7).Returns(Task.CompletedTask);
+
+        await _sut.MarkAsRead();
+
+        await _feedService.Received(1).MarkAsReadAsync(7);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private void SetupAuthenticatedUser(int userId)

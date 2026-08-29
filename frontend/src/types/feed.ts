@@ -43,5 +43,14 @@ const makePaginatedSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
 export const newsPaginatedSchema = makePaginatedSchema(newsItemSchema);
 export type NewsPaginatedResponse = z.infer<typeof newsPaginatedSchema>;
 
-export const programsPaginatedSchema = makePaginatedSchema(programAppearanceSchema);
+export const programsPaginatedSchema = makePaginatedSchema(
+  programAppearanceSchema,
+);
 export type ProgramsPaginatedResponse = z.infer<typeof programsPaginatedSchema>;
+
+/** GET /api/v1/feed/unread-count のレスポンス */
+export const unreadCountSchema = z.object({
+  unreadCount: z.number().int().nonnegative(),
+});
+
+export type UnreadCountResponse = z.infer<typeof unreadCountSchema>;

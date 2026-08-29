@@ -16,6 +16,9 @@ public class User
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    /// <summary>ユーザーが最後にフィード一覧を閲覧した日時（UTC）。null は未閲覧</summary>
+    public DateTime? LastViewedFeedAt { get; set; }
+
     // Navigation
     public ICollection<Oshi> Oshis { get; set; } = new List<Oshi>();
 }

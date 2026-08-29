@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { logout } from "../api/auth";
 import { getOshis } from "../api/oshi";
+import { getUnreadCount, markAsRead } from "../api/feed";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { OshiForm } from "../components/oshi/OshiForm";
@@ -9,6 +10,7 @@ import { OshiList } from "../components/oshi/OshiList";
 import { NewsFeedList } from "../components/feed/NewsFeedList";
 import { ProgramFeedList } from "../components/feed/ProgramFeedList";
 import { OshiFilter } from "../components/feed/OshiFilter";
+import { NotificationBadge } from "../components/feed/NotificationBadge";
 import { CollectorStatus } from "../components/collector/CollectorStatus";
 import type { OshiResponse } from "../types/oshi";
 
@@ -27,6 +29,9 @@ export function DashboardPage() {
   const [isFetchingOshis, setIsFetchingOshis] = useState(false);
   const [fetchOshisError, setFetchOshisError] = useState<string | null>(null);
 
+  // 未読件数（ページ開くと取得→表示後にリセット）
+  const [unreadCount, setUnreadCount] = useState(0);
+
   // URLクエリパラメータから選択中の推しIDを読み取る
   const selectedOshiId = (() => {
     const val = searchParams.get("oshiId");
@@ -34,7 +39,7 @@ export function DashboardPage() {
     return null;
   })();
 
-  // マウント時に推し一覧を取得する
+  // マウント時に推し一覧・未読件数を取得し、既読にリセットする
   useEffect(() => {
     const fetchOshis = async () => {
       setIsFetchingOshis(true);
@@ -53,7 +58,20 @@ export function DashboardPage() {
       }
     };
 
+    const fetchAndResetUnread = async () => {
+      try {
+        // 未読件数を取得してバッジに表示（前回訪問以降の新着数をユーザーへ通知）
+        const count = await getUnreadCount();
+        setUnreadCount(count);
+        // フィード一覧を開いたのでサーバー側カウントをリセット（次回訪問で 0 になる）
+        await markAsRead();
+      } catch {
+        // 未読件数の取得・リセット失敗はサイレントに処理（メイン機能ではない）
+      }
+    };
+
     void fetchOshis();
+    void fetchAndResetUnread();
   }, []);
 
   const handleOshiAdded = (oshi: OshiResponse) => {
@@ -97,7 +115,10 @@ export function DashboardPage() {
   return (
     <main>
       <header>
-        <h1>oshikatsu ダッシュボード</h1>
+        <h1>
+          oshikatsu ダッシュボード
+          <NotificationBadge count={unreadCount} />
+        </h1>
         <button onClick={() => void handleLogout()} disabled={isLoggingOut}>
           {isLoggingOut ? "ログアウト中..." : "ログアウト"}
         </button>

@@ -67,6 +67,38 @@ public class FeedController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// ログインユーザーの前回閲覧以降に追加されたニュース・出演番組の合計未読件数を返す。
+    /// LastViewedFeedAt が null（未閲覧）の場合は 0 を返す。
+    /// </summary>
+    /// <response code="200">未読件数</response>
+    /// <response code="401">未認証</response>
+    [HttpGet("feed/unread-count")]
+    [ProducesResponseType(typeof(UnreadCountResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetUnreadCount()
+    {
+        var userId = GetCurrentUserId();
+        var count = await _feedService.GetUnreadCountAsync(userId);
+        return Ok(new UnreadCountResponseDto { UnreadCount = count });
+    }
+
+    /// <summary>
+    /// ユーザーのフィード閲覧日時を現在日時に更新し、未読件数をリセットする。
+    /// フィード一覧を開いたタイミングで呼び出す。
+    /// </summary>
+    /// <response code="204">リセット成功</response>
+    /// <response code="401">未認証</response>
+    [HttpPost("feed/mark-as-read")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> MarkAsRead()
+    {
+        var userId = GetCurrentUserId();
+        await _feedService.MarkAsReadAsync(userId);
+        return NoContent();
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private int GetCurrentUserId()

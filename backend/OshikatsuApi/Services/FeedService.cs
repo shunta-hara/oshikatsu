@@ -137,4 +137,47 @@ public class FeedService : IFeedService
             PageSize = pageSize,
         };
     }
+
+    /// <inheritdoc />
+    public async Task<int> GetUnreadCountAsync(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId);
+        if (user?.LastViewedFeedAt is null)
+        {
+            // 未閲覧ユーザーは 0 を返す（比較基準がないため）
+            return 0;
+        }
+
+        var lastViewed = user.LastViewedFeedAt.Value;
+
+        var oshiIds = await _db.Oshis
+            .Where(o => o.UserId == userId)
+            .Select(o => o.Id)
+            .ToListAsync();
+
+        if (oshiIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var newsCount = await _db.NewsItems
+            .Where(n => oshiIds.Contains(n.OshiId) && n.CollectedAt > lastViewed)
+            .CountAsync();
+
+        var programCount = await _db.ProgramAppearances
+            .Where(p => oshiIds.Contains(p.OshiId) && p.CollectedAt > lastViewed)
+            .CountAsync();
+
+        return newsCount + programCount;
+    }
+
+    /// <inheritdoc />
+    public async Task MarkAsReadAsync(int userId)
+    {
+        var user = await _db.Users.FindAsync(userId)
+            ?? throw new InvalidOperationException($"User {userId} not found.");
+
+        user.LastViewedFeedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+    }
 }
