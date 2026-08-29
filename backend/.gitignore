@@ -1,0 +1,25 @@
+## .NET build artifacts
+bin/
+obj/
+
+## appsettings with secrets (use environment variables or User Secrets instead)
+**/appsettings.Development.json
+**/appsettings.Production.json
+
+## Visual Studio
+.vs/
+*.user
+*.suo
+*.vsidx
+
+## JetBrains Rider
+.idea/
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+## Coverage
+TestResults/
+coverage/

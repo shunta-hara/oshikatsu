@@ -1,0 +1,22 @@
+# frontend (Node/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# backend (.NET)
+backend/bin/
+backend/obj/
+backend/appsettings.Development.json
+backend/appsettings.Local.json
+
+# collector (Python)
+collector/__pycache__/
+collector/**/__pycache__/
+collector/.venv/
+collector/*.egg-info/
+
+# common
+.env
+.env.*
+*.log
+.DS_Store

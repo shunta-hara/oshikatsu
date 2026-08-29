@@ -1,0 +1,259 @@
+"""
+backend 内部 API クライアント。
+collector が収集したデータを backend に送信する。
+"""
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
+
+import requests
+
+from collector.config import CollectorConfig
+from collector.logger import get_logger
+
+logger = get_logger(__name__)
+
+# リトライ対象の HTTP ステータスコード
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+@dataclass
+class OshiInfo:
+    """推し情報（backend 内部 API から取得）"""
+
+    id: int
+    name: str
+
+
+class BackendClient:
+    """backend 内部 API への HTTP クライアント。"""
+
+    def __init__(self, config: CollectorConfig) -> None:
+        self._base_url = config.backend_base_url.rstrip("/")
+        self._api_key = config.collector_api_key
+        self._timeout = config.request_timeout_seconds
+        self._max_retries = config.max_retries
+        self._session = requests.Session()
+        self._session.headers.update(
+            {
+                "X-Api-Key": self._api_key,
+                "Content-Type": "application/json",
+            }
+        )
+
+    def get_oshis(self) -> list[OshiInfo]:
+        """
+        全推し一覧を backend 内部 API から取得する。
+
+        返り値は OshiInfo のリスト。
+        不正なデータ形式のアイテムはスキップする。
+        """
+        raw: Any = self._get_with_retry("/api/v1/internal/oshis")
+
+        if not isinstance(raw, list):
+            logger.warning("Unexpected response format from /api/v1/internal/oshis: %r", raw)
+            return []
+
+        result: list[OshiInfo] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                logger.warning("Unexpected oshi item format: %r", item)
+                continue
+            oshi_id = item.get("id")
+            name = item.get("name")
+            if not isinstance(oshi_id, int) or not isinstance(name, str):
+                logger.warning("Malformed oshi data (id=%r, name=%r), skipping.", oshi_id, name)
+                continue
+            result.append(OshiInfo(id=oshi_id, name=name))
+
+        return result
+
+    def post_news_item(
+        self,
+        *,
+        oshi_id: int,
+        title: str,
+        source_url: str,
+        collected_at: datetime,
+        summary: str | None = None,
+        published_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        """
+        ニュースアイテムを backend に送信する。
+
+        published_at が None の場合は backend 側で collected_at で代替され、
+        is_published_at_estimated が True になる。
+        """
+        payload: dict[str, Any] = {
+            "oshiId": oshi_id,
+            "title": title,
+            "sourceUrl": source_url,
+            "collectedAt": _to_iso(collected_at),
+        }
+        if summary is not None:
+            payload["summary"] = summary
+        if published_at is not None:
+            payload["publishedAt"] = _to_iso(published_at)
+
+        return self._post_with_retry("/api/v1/internal/news", payload)
+
+    def post_job_log(
+        self,
+        *,
+        job_type: str,
+        executed_at: datetime,
+        success_count: int,
+        failure_count: int,
+    ) -> dict[str, Any]:
+        """
+        バッチ実行ログを backend 内部 API に送信する。
+
+        job_type は "news" または "program"。
+        """
+        payload: dict[str, Any] = {
+            "jobType": job_type,
+            "executedAt": _to_iso(executed_at),
+            "successCount": success_count,
+            "failureCount": failure_count,
+        }
+        return self._post_with_retry("/api/v1/internal/job-logs", payload)
+
+    def post_program_appearance(
+        self,
+        *,
+        oshi_id: int,
+        program_name: str,
+        source_url: str,
+        collected_at: datetime,
+        broadcaster: str | None = None,
+        aired_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        """
+        出演番組情報を backend に送信する。
+
+        aired_at が None の場合は backend 側で collected_at で代替され、
+        is_aired_at_estimated が True になる。
+        """
+        payload: dict[str, Any] = {
+            "oshiId": oshi_id,
+            "programName": program_name,
+            "sourceUrl": source_url,
+            "collectedAt": _to_iso(collected_at),
+        }
+        if broadcaster is not None:
+            payload["broadcaster"] = broadcaster
+        if aired_at is not None:
+            payload["airedAt"] = _to_iso(aired_at)
+
+        return self._post_with_retry("/api/v1/internal/programs", payload)
+
+    def _get_with_retry(self, path: str) -> Any:
+        """
+        指数バックオフ付きリトライで GET を実行する。
+        最大 max_retries 回まで一時的な失敗（429/5xx/ネットワークエラー）をリトライする。
+        """
+        url = f"{self._base_url}{path}"
+        last_exception: Exception | None = None
+
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                response = self._session.get(url, timeout=self._timeout)
+
+                if response.status_code in _RETRYABLE_STATUS_CODES:
+                    wait = _backoff(attempt)
+                    logger.warning(
+                        "GET %s returned %d (attempt %d/%d). Retrying in %.1fs.",
+                        path,
+                        response.status_code,
+                        attempt,
+                        self._max_retries,
+                        wait,
+                    )
+                    if attempt < self._max_retries:
+                        time.sleep(wait)
+                    continue
+
+                response.raise_for_status()
+                return response.json()
+
+            except requests.exceptions.RequestException as exc:
+                last_exception = exc
+                wait = _backoff(attempt)
+                logger.warning(
+                    "GET %s failed (attempt %d/%d): %s. Retrying in %.1fs.",
+                    path,
+                    attempt,
+                    self._max_retries,
+                    exc,
+                    wait,
+                )
+                if attempt < self._max_retries:
+                    time.sleep(wait)
+
+        raise RuntimeError(
+            f"GET {path} failed after {self._max_retries} attempts."
+        ) from last_exception
+
+    def _post_with_retry(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        指数バックオフ付きリトライで POST を実行する。
+        最大 max_retries 回まで一時的な失敗（429/5xx/ネットワークエラー）をリトライする。
+        """
+        url = f"{self._base_url}{path}"
+        last_exception: Exception | None = None
+
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                response = self._session.post(
+                    url, json=payload, timeout=self._timeout
+                )
+
+                if response.status_code in _RETRYABLE_STATUS_CODES:
+                    wait = _backoff(attempt)
+                    logger.warning(
+                        "POST %s returned %d (attempt %d/%d). Retrying in %.1fs.",
+                        path,
+                        response.status_code,
+                        attempt,
+                        self._max_retries,
+                        wait,
+                    )
+                    if attempt < self._max_retries:
+                        time.sleep(wait)
+                    continue
+
+                response.raise_for_status()
+                return response.json()  # type: ignore[no-any-return]
+
+            except requests.exceptions.RequestException as exc:
+                last_exception = exc
+                wait = _backoff(attempt)
+                logger.warning(
+                    "POST %s failed (attempt %d/%d): %s. Retrying in %.1fs.",
+                    path,
+                    attempt,
+                    self._max_retries,
+                    exc,
+                    wait,
+                )
+                if attempt < self._max_retries:
+                    time.sleep(wait)
+
+        raise RuntimeError(
+            f"POST {path} failed after {self._max_retries} attempts."
+        ) from last_exception
+
+
+def _to_iso(dt: datetime) -> str:
+    """datetime を UTC ISO 8601 文字列に変換する。"""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.isoformat()
+
+
+def _backoff(attempt: int) -> float:
+    """指数バックオフの待機秒数（上限 60 秒）を返す。"""
+    return min(2 ** (attempt - 1), 60)

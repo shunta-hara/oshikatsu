@@ -1,0 +1,4 @@
+# Generator Agent Memory
+
+- [Sprint 2 実装コンテキスト](sprint2-auth-context.md) — JWT 認証 + BCrypt 実装時の判断・注意点
+- [Sprint 3 実装コンテキスト](sprint3-oshi-context.md) — 推し登録・管理 API 実装時の判断・注意点

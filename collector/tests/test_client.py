@@ -1,0 +1,440 @@
+"""collector.client のテスト"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
+
+import pytest
+import responses as resp
+
+from collector.client import BackendClient, OshiInfo, _backoff, _to_iso
+from collector.config import CollectorConfig
+
+
+def make_config(
+    base_url: str = "http://backend:8080",
+    api_key: str = "test-key",
+    timeout: int = 5,
+    max_retries: int = 3,
+) -> CollectorConfig:
+    config = MagicMock(spec=CollectorConfig)
+    config.backend_base_url = base_url
+    config.collector_api_key = api_key
+    config.request_timeout_seconds = timeout
+    config.max_retries = max_retries
+    return config
+
+
+NEWS_URL = "http://backend:8080/api/v1/internal/news"
+PROG_URL = "http://backend:8080/api/v1/internal/programs"
+
+_NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
+
+
+class TestPostNewsItem:
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_news_item_success_returns_response(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={"id": 1, "wasDuplicate": False}, status=200)
+        client = BackendClient(make_config())
+
+        result = client.post_news_item(
+            oshi_id=1,
+            title="テストニュース",
+            source_url="https://example.com/news/1",
+            collected_at=_NOW,
+        )
+
+        assert result["id"] == 1
+        assert result["wasDuplicate"] is False
+
+    @resp.activate
+    def test_post_news_item_sends_api_key_header(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config(api_key="my-secret"))
+
+        client.post_news_item(
+            oshi_id=1,
+            title="title",
+            source_url="https://example.com/1",
+            collected_at=_NOW,
+        )
+
+        assert resp.calls[0].request.headers["X-Api-Key"] == "my-secret"
+
+    @resp.activate
+    def test_post_news_item_with_published_at_includes_field(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config())
+        published = datetime(2026, 7, 14, 10, 0, 0, tzinfo=timezone.utc)
+
+        client.post_news_item(
+            oshi_id=1,
+            title="title",
+            source_url="https://example.com/1",
+            collected_at=_NOW,
+            published_at=published,
+        )
+
+        import json
+        body = json.loads(resp.calls[0].request.body)
+        assert "publishedAt" in body
+
+    @resp.activate
+    def test_post_news_item_without_published_at_omits_field(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config())
+
+        client.post_news_item(
+            oshi_id=1,
+            title="title",
+            source_url="https://example.com/1",
+            collected_at=_NOW,
+        )
+
+        import json
+        body = json.loads(resp.calls[0].request.body)
+        assert "publishedAt" not in body
+
+    # ── 異常系・リトライ ──────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_news_item_retries_on_500(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={}, status=500)
+        resp.add(resp.POST, NEWS_URL, json={}, status=500)
+        resp.add(resp.POST, NEWS_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config(max_retries=3))
+
+        # sleep をモック（テストを速くする）
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.post_news_item(
+                oshi_id=1,
+                title="title",
+                source_url="https://example.com/retry",
+                collected_at=_NOW,
+            )
+
+        assert result["id"] == 1
+        assert len(resp.calls) == 3
+
+    @resp.activate
+    def test_post_news_item_raises_after_max_retries_exceeded(self) -> None:
+        # 全試行 500 を返す
+        for _ in range(3):
+            resp.add(resp.POST, NEWS_URL, json={}, status=500)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            with pytest.raises(RuntimeError, match="failed after 3 attempts"):
+                client.post_news_item(
+                    oshi_id=1,
+                    title="title",
+                    source_url="https://example.com/fail",
+                    collected_at=_NOW,
+                )
+
+    @resp.activate
+    def test_post_news_item_retries_on_429(self) -> None:
+        resp.add(resp.POST, NEWS_URL, json={}, status=429)
+        resp.add(resp.POST, NEWS_URL, json={"id": 2}, status=200)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.post_news_item(
+                oshi_id=1,
+                title="title",
+                source_url="https://example.com/429",
+                collected_at=_NOW,
+            )
+
+        assert result["id"] == 2
+
+
+class TestPostProgramAppearance:
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_program_success_returns_response(self) -> None:
+        resp.add(resp.POST, PROG_URL, json={"id": 10, "wasDuplicate": False}, status=200)
+        client = BackendClient(make_config())
+
+        result = client.post_program_appearance(
+            oshi_id=1,
+            program_name="テスト番組",
+            source_url="https://tv.example.com/1",
+            collected_at=_NOW,
+        )
+
+        assert result["id"] == 10
+        assert result["wasDuplicate"] is False
+
+    @resp.activate
+    def test_post_program_with_aired_at_includes_field(self) -> None:
+        resp.add(resp.POST, PROG_URL, json={"id": 10}, status=200)
+        client = BackendClient(make_config())
+        aired = datetime(2026, 7, 14, 20, 0, 0, tzinfo=timezone.utc)
+
+        client.post_program_appearance(
+            oshi_id=1,
+            program_name="番組",
+            source_url="https://tv.example.com/2",
+            collected_at=_NOW,
+            aired_at=aired,
+        )
+
+        import json
+        body = json.loads(resp.calls[0].request.body)
+        assert "airedAt" in body
+
+    @resp.activate
+    def test_post_program_without_aired_at_omits_field(self) -> None:
+        resp.add(resp.POST, PROG_URL, json={"id": 10}, status=200)
+        client = BackendClient(make_config())
+
+        client.post_program_appearance(
+            oshi_id=1,
+            program_name="番組",
+            source_url="https://tv.example.com/3",
+            collected_at=_NOW,
+        )
+
+        import json
+        body = json.loads(resp.calls[0].request.body)
+        assert "airedAt" not in body
+
+    # ── 重複 ─────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_program_duplicate_returns_duplicate_flag(self) -> None:
+        resp.add(resp.POST, PROG_URL, json={"id": 10, "wasDuplicate": True}, status=200)
+        client = BackendClient(make_config())
+
+        result = client.post_program_appearance(
+            oshi_id=1,
+            program_name="番組",
+            source_url="https://tv.example.com/dup",
+            collected_at=_NOW,
+        )
+
+        assert result["wasDuplicate"] is True
+
+
+class TestGetOshis:
+    OSHIS_URL = "http://backend:8080/api/v1/internal/oshis"
+
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_get_oshis_success_returns_list(self) -> None:
+        resp.add(
+            resp.GET,
+            self.OSHIS_URL,
+            json=[{"id": 1, "name": "推しA"}, {"id": 2, "name": "推しB"}],
+            status=200,
+        )
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        assert len(result) == 2
+        assert isinstance(result[0], OshiInfo)
+        assert result[0].id == 1
+        assert result[0].name == "推しA"
+        assert result[1].id == 2
+        assert result[1].name == "推しB"
+
+    @resp.activate
+    def test_get_oshis_sends_api_key_header(self) -> None:
+        resp.add(resp.GET, self.OSHIS_URL, json=[], status=200)
+        client = BackendClient(make_config(api_key="secret-key"))
+
+        client.get_oshis()
+
+        assert resp.calls[0].request.headers["X-Api-Key"] == "secret-key"
+
+    @resp.activate
+    def test_get_oshis_empty_list_returns_empty(self) -> None:
+        resp.add(resp.GET, self.OSHIS_URL, json=[], status=200)
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        assert result == []
+
+    # ── 異常系・リトライ ──────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_get_oshis_retries_on_500(self) -> None:
+        resp.add(resp.GET, self.OSHIS_URL, json={}, status=500)
+        resp.add(resp.GET, self.OSHIS_URL, json=[{"id": 1, "name": "推し"}], status=200)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.get_oshis()
+
+        assert len(result) == 1
+        assert len(resp.calls) == 2
+
+    @resp.activate
+    def test_get_oshis_raises_after_max_retries(self) -> None:
+        for _ in range(3):
+            resp.add(resp.GET, self.OSHIS_URL, json={}, status=500)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            with pytest.raises(RuntimeError, match="failed after 3 attempts"):
+                client.get_oshis()
+
+    @resp.activate
+    def test_get_oshis_retries_on_429(self) -> None:
+        resp.add(resp.GET, self.OSHIS_URL, json={}, status=429)
+        resp.add(resp.GET, self.OSHIS_URL, json=[{"id": 1, "name": "推し"}], status=200)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.get_oshis()
+
+        assert len(result) == 1
+
+    # ── バリデーション ────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_get_oshis_filters_malformed_items(self) -> None:
+        resp.add(
+            resp.GET,
+            self.OSHIS_URL,
+            json=[
+                {"id": 1, "name": "正常"},
+                {"id": "not-an-int", "name": "不正ID"},
+                {"id": 2},  # name がない
+                "not-a-dict",
+            ],
+            status=200,
+        )
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        assert len(result) == 1
+        assert result[0].id == 1
+        assert result[0].name == "正常"
+
+
+class TestPostJobLog:
+    JOB_LOG_URL = "http://backend:8080/api/v1/internal/job-logs"
+
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_job_log_success_returns_response(self) -> None:
+        resp.add(resp.POST, self.JOB_LOG_URL, json={"id": 1, "jobType": "news"}, status=200)
+        client = BackendClient(make_config())
+
+        result = client.post_job_log(
+            job_type="news",
+            executed_at=_NOW,
+            success_count=5,
+            failure_count=0,
+        )
+
+        assert result["id"] == 1
+        assert result["jobType"] == "news"
+
+    @resp.activate
+    def test_post_job_log_sends_api_key_header(self) -> None:
+        resp.add(resp.POST, self.JOB_LOG_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config(api_key="secret"))
+
+        client.post_job_log(
+            job_type="news",
+            executed_at=_NOW,
+            success_count=0,
+            failure_count=1,
+        )
+
+        assert resp.calls[0].request.headers["X-Api-Key"] == "secret"
+
+    @resp.activate
+    def test_post_job_log_sends_correct_payload(self) -> None:
+        resp.add(resp.POST, self.JOB_LOG_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config())
+
+        client.post_job_log(
+            job_type="program",
+            executed_at=_NOW,
+            success_count=3,
+            failure_count=2,
+        )
+
+        import json
+        body = json.loads(resp.calls[0].request.body)
+        assert body["jobType"] == "program"
+        assert body["successCount"] == 3
+        assert body["failureCount"] == 2
+        assert "executedAt" in body
+
+    # ── 異常系・リトライ ──────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_job_log_retries_on_500(self) -> None:
+        resp.add(resp.POST, self.JOB_LOG_URL, json={}, status=500)
+        resp.add(resp.POST, self.JOB_LOG_URL, json={"id": 1}, status=200)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.post_job_log(
+                job_type="news",
+                executed_at=_NOW,
+                success_count=0,
+                failure_count=0,
+            )
+
+        assert result["id"] == 1
+        assert len(resp.calls) == 2
+
+    @resp.activate
+    def test_post_job_log_raises_after_max_retries(self) -> None:
+        for _ in range(3):
+            resp.add(resp.POST, self.JOB_LOG_URL, json={}, status=500)
+        client = BackendClient(make_config(max_retries=3))
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            with pytest.raises(RuntimeError, match="failed after 3 attempts"):
+                client.post_job_log(
+                    job_type="news",
+                    executed_at=_NOW,
+                    success_count=0,
+                    failure_count=0,
+                )
+
+
+class TestHelpers:
+    def test_to_iso_with_utc(self) -> None:
+        dt = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
+        assert _to_iso(dt) == "2026-07-14T12:00:00+00:00"
+
+    def test_to_iso_naive_adds_utc(self) -> None:
+        dt = datetime(2026, 7, 14, 12, 0, 0)
+        result = _to_iso(dt)
+        assert "+00:00" in result
+
+    def test_backoff_attempt1_returns_1(self) -> None:
+        assert _backoff(1) == 1
+
+    def test_backoff_attempt2_returns_2(self) -> None:
+        assert _backoff(2) == 2
+
+    def test_backoff_attempt3_returns_4(self) -> None:
+        assert _backoff(3) == 4
+
+    def test_backoff_large_attempt_capped_at_60(self) -> None:
+        assert _backoff(100) == 60
