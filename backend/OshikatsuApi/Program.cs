@@ -84,6 +84,9 @@ builder.Services.AddScoped<IInternalCollectorService, InternalCollectorService>(
 // ユーザー向けフィードサービス（ニュース・出演番組一覧）
 builder.Services.AddScoped<IFeedService, FeedService>();
 
+// マルチ推しダッシュボード集計サービス
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+
 // collector ジョブログサービス
 builder.Services.AddScoped<ICollectorJobLogService, CollectorJobLogService>();
 

@@ -7,6 +7,7 @@ import * as authApi from "../api/auth";
 import * as oshiApi from "../api/oshi";
 import * as feedApi from "../api/feed";
 import * as collectorApi from "../api/collector";
+import * as dashboardApi from "../api/dashboard";
 import { ApiError } from "../api/client";
 import { AuthProvider } from "../context/AuthContext";
 
@@ -14,6 +15,8 @@ vi.mock("../api/auth");
 vi.mock("../api/oshi");
 vi.mock("../api/feed");
 vi.mock("../api/collector");
+vi.mock("../api/dashboard");
+
 const mockLogout = vi.mocked(authApi.logout);
 const mockGetOshis = vi.mocked(oshiApi.getOshis);
 const mockGetNews = vi.mocked(feedApi.getNews);
@@ -21,6 +24,7 @@ const mockGetPrograms = vi.mocked(feedApi.getPrograms);
 const mockGetUnreadCount = vi.mocked(feedApi.getUnreadCount);
 const mockMarkAsRead = vi.mocked(feedApi.markAsRead);
 const mockGetCollectorStatus = vi.mocked(collectorApi.getCollectorStatus);
+const mockGetDashboardSummary = vi.mocked(dashboardApi.getDashboardSummary);
 
 const emptyNewsPage = {
   items: [] as [],
@@ -73,6 +77,8 @@ describe("DashboardPage", () => {
     // デフォルトで未読件数 0、mark-as-read は成功
     mockGetUnreadCount.mockResolvedValue(0);
     mockMarkAsRead.mockResolvedValue(undefined);
+    // デフォルトで空のダッシュボードカードを返す
+    mockGetDashboardSummary.mockResolvedValue([]);
   });
 
   // --- 正常系 ---
@@ -327,6 +333,90 @@ describe("DashboardPage", () => {
       expect(
         screen.getByRole("status", { name: "未読 5 件" }),
       ).toBeInTheDocument();
+    });
+  });
+
+  // --- マルチ推しダッシュボード ---
+  it("マルチ推しダッシュボードセクションのタイトルが表示される", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(screen.getByText("マルチ推しダッシュボード")).toBeInTheDocument();
+    });
+  });
+
+  it("ページ読み込み時に getDashboardSummary が呼ばれる", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(mockGetDashboardSummary).toHaveBeenCalledOnce();
+    });
+  });
+
+  it("推しが0件のとき「推しを登録するとダッシュボードカードが表示されます」が表示される", async () => {
+    mockGetDashboardSummary.mockResolvedValue([]);
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "推しを登録するとダッシュボードカードが表示されます。",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("ダッシュボードカードが返ったとき推し名が表示される", async () => {
+    mockGetDashboardSummary.mockResolvedValue([
+      {
+        oshiId: 1,
+        oshiName: "推しX",
+        latestNews: null,
+        latestProgram: null,
+      },
+    ]);
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(screen.getByText("推しX")).toBeInTheDocument();
+    });
+  });
+
+  it("カードの推し名リンクをクリックすると oshiId クエリパラメータが付く", async () => {
+    mockGetDashboardSummary.mockResolvedValue([
+      {
+        oshiId: 7,
+        oshiName: "推しY",
+        latestNews: null,
+        latestProgram: null,
+      },
+    ]);
+    mockGetOshis.mockResolvedValue([
+      { id: 7, name: "推しY", createdAt: "2026-07-01T00:00:00+09:00" },
+    ]);
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(screen.getByRole("link", { name: "推しY" })).toBeInTheDocument();
+    });
+
+    const link = screen.getByRole("link", { name: "推しY" });
+    expect(link).toHaveAttribute("href", "/?oshiId=7");
+  });
+
+  it("ダッシュボード取得に失敗したときエラーアラートが表示される", async () => {
+    mockGetDashboardSummary.mockRejectedValue(
+      new ApiError(500, "Internal Server Error"),
+    );
+
+    renderWithProvider();
+
+    await waitFor(() => {
+      // fetchOshisError または fetchDashboardError のいずれかの alert
+      expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     });
   });
 });

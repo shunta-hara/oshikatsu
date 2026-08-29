@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { logout } from "../api/auth";
 import { getOshis } from "../api/oshi";
 import { getUnreadCount, markAsRead } from "../api/feed";
+import { getDashboardSummary } from "../api/dashboard";
 import { ApiError } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { OshiForm } from "../components/oshi/OshiForm";
@@ -12,11 +13,13 @@ import { ProgramFeedList } from "../components/feed/ProgramFeedList";
 import { OshiFilter } from "../components/feed/OshiFilter";
 import { NotificationBadge } from "../components/feed/NotificationBadge";
 import { CollectorStatus } from "../components/collector/CollectorStatus";
+import { OshiCardList } from "../components/dashboard/OshiCardList";
 import type { OshiResponse } from "../types/oshi";
+import type { OshiDashboardCard } from "../types/dashboard";
 
 /**
  * ダッシュボードページ（認証済みユーザー専用）。
- * 推し管理セクション・フィードフィルタUI・収集ジョブ状況を含む。
+ * 推し管理セクション・マルチ推しダッシュボード・フィードフィルタUI・収集ジョブ状況を含む。
  */
 export function DashboardPage() {
   const { clearAuth } = useAuth();
@@ -29,6 +32,13 @@ export function DashboardPage() {
   const [isFetchingOshis, setIsFetchingOshis] = useState(false);
   const [fetchOshisError, setFetchOshisError] = useState<string | null>(null);
 
+  // マルチ推しダッシュボードカード
+  const [dashboardCards, setDashboardCards] = useState<OshiDashboardCard[]>([]);
+  const [isFetchingDashboard, setIsFetchingDashboard] = useState(false);
+  const [fetchDashboardError, setFetchDashboardError] = useState<string | null>(
+    null,
+  );
+
   // 未読件数（ページ開くと取得→表示後にリセット）
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -39,7 +49,24 @@ export function DashboardPage() {
     return null;
   })();
 
-  // マウント時に推し一覧・未読件数を取得し、既読にリセットする
+  const fetchDashboard = async () => {
+    setIsFetchingDashboard(true);
+    setFetchDashboardError(null);
+    try {
+      const data = await getDashboardSummary();
+      setDashboardCards(data);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setFetchDashboardError(err.message);
+      } else {
+        setFetchDashboardError("ダッシュボードの取得に失敗しました");
+      }
+    } finally {
+      setIsFetchingDashboard(false);
+    }
+  };
+
+  // マウント時に推し一覧・ダッシュボード・未読件数を取得し、既読にリセットする
   useEffect(() => {
     const fetchOshis = async () => {
       setIsFetchingOshis(true);
@@ -71,11 +98,15 @@ export function DashboardPage() {
     };
 
     void fetchOshis();
+    void fetchDashboard();
     void fetchAndResetUnread();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleOshiAdded = (oshi: OshiResponse) => {
     setOshis((prev) => [...prev, oshi]);
+    // 推し追加後にダッシュボードカードを再取得する
+    void fetchDashboard();
   };
 
   const handleOshiDeleted = (id: number) => {
@@ -84,6 +115,8 @@ export function DashboardPage() {
     if (selectedOshiId === id) {
       setSearchParams({});
     }
+    // 推し削除後にダッシュボードカードを再取得する
+    void fetchDashboard();
   };
 
   const handleOshiFilterChange = (oshiId: number | null) => {
@@ -144,6 +177,22 @@ export function DashboardPage() {
           <p>読み込み中...</p>
         ) : (
           <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
+        )}
+      </section>
+
+      <section aria-labelledby="multi-oshi-dashboard-title">
+        <h2 id="multi-oshi-dashboard-title">マルチ推しダッシュボード</h2>
+
+        {fetchDashboardError && (
+          <div role="alert" aria-live="assertive">
+            {fetchDashboardError}
+          </div>
+        )}
+
+        {isFetchingDashboard ? (
+          <p>読み込み中...</p>
+        ) : (
+          <OshiCardList cards={dashboardCards} />
         )}
       </section>
 
