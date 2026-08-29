@@ -13,6 +13,8 @@ export async function getNews(
   pageSize: number = 20,
   oshiId?: number,
   query?: string,
+  from?: string,
+  to?: string,
 ): Promise<NewsPaginatedResponse> {
   let url = `/news?page=${page}&pageSize=${pageSize}`;
   if (oshiId !== undefined) {
@@ -20,6 +22,12 @@ export async function getNews(
   }
   if (query !== undefined && query !== "") {
     url += `&q=${encodeURIComponent(query)}`;
+  }
+  if (from !== undefined) {
+    url += `&from=${encodeURIComponent(from)}`;
+  }
+  if (to !== undefined) {
+    url += `&to=${encodeURIComponent(to)}`;
   }
   const raw = await apiFetch<unknown>(url);
   return newsPaginatedSchema.parse(raw);
@@ -30,10 +38,18 @@ export async function getPrograms(
   page: number = 1,
   pageSize: number = 20,
   oshiId?: number,
+  from?: string,
+  to?: string,
 ): Promise<ProgramsPaginatedResponse> {
   let url = `/programs?page=${page}&pageSize=${pageSize}`;
   if (oshiId !== undefined) {
     url += `&oshiId=${oshiId}`;
+  }
+  if (from !== undefined) {
+    url += `&from=${encodeURIComponent(from)}`;
+  }
+  if (to !== undefined) {
+    url += `&to=${encodeURIComponent(to)}`;
   }
   const raw = await apiFetch<unknown>(url);
   return programsPaginatedSchema.parse(raw);

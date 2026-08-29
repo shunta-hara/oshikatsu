@@ -16,7 +16,9 @@ public class FeedService : IFeedService
 
     /// <inheritdoc />
     public async Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(
-        int userId, int page, int pageSize, int? oshiId = null, string? query = null)
+        int userId, int page, int pageSize,
+        int? oshiId = null, string? query = null,
+        DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
         // ユーザーの推し ID 一覧を取得（サブクエリよりも InMemory・SQL 両対応しやすい）
         var oshiIds = await _db.Oshis
@@ -48,6 +50,17 @@ public class FeedService : IFeedService
             newsQuery = newsQuery.Where(n =>
                 n.Title.Contains(query) ||
                 (n.Summary != null && n.Summary.Contains(query)));
+        }
+
+        // 日付範囲フィルタ: 公開日時（PublishedAt）で絞り込む。
+        // PublishedAt が null のアイテムはフィルタ適用時に除外される。
+        if (from.HasValue)
+        {
+            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt >= from.Value);
+        }
+        if (to.HasValue)
+        {
+            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt <= to.Value);
         }
 
         var orderedQuery = newsQuery.OrderByDescending(n => n.CollectedAt);
@@ -87,7 +100,9 @@ public class FeedService : IFeedService
 
     /// <inheritdoc />
     public async Task<PaginatedResponseDto<ProgramAppearanceResponseDto>> GetProgramsAsync(
-        int userId, int page, int pageSize, int? oshiId = null)
+        int userId, int page, int pageSize,
+        int? oshiId = null,
+        DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
         var oshiIds = await _db.Oshis
             .Where(o => o.UserId == userId)
@@ -110,9 +125,20 @@ public class FeedService : IFeedService
             oshiIds = [oshiId.Value];
         }
 
-        var query = _db.ProgramAppearances
-            .Where(p => oshiIds.Contains(p.OshiId))
-            .OrderByDescending(p => p.CollectedAt);
+        var programsQuery = _db.ProgramAppearances.Where(p => oshiIds.Contains(p.OshiId));
+
+        // 日付範囲フィルタ: 放送日時（AiredAt）で絞り込む。
+        // AiredAt が null のアイテムはフィルタ適用時に除外される。
+        if (from.HasValue)
+        {
+            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt >= from.Value);
+        }
+        if (to.HasValue)
+        {
+            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt <= to.Value);
+        }
+
+        var query = programsQuery.OrderByDescending(p => p.CollectedAt);
 
         var total = await query.CountAsync();
         var rawItems = await query

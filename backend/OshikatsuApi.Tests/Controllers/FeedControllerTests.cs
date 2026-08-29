@@ -295,6 +295,100 @@ public class FeedControllerTests
         await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null);
     }
 
+    // ── GET /api/v1/news: 日付範囲フィルタ ──────────────────────────────────
+
+    [Fact]
+    public async Task GetNews_WithFromAndTo_PassesDateRangeToService()
+    {
+        var from = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 8, 31, 23, 59, 59, TimeSpan.Zero);
+        _feedService.GetNewsAsync(1, 1, 20, null, null, from, to).Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(from: from, to: to);
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, from, to);
+    }
+
+    [Fact]
+    public async Task GetNews_WithOnlyFrom_PassesFromToService()
+    {
+        var from = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+        _feedService.GetNewsAsync(1, 1, 20, null, null, from, null).Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(from: from);
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, from, null);
+    }
+
+    [Fact]
+    public async Task GetNews_WithOnlyTo_PassesToToService()
+    {
+        var to = new DateTimeOffset(2026, 8, 31, 23, 59, 59, TimeSpan.Zero);
+        _feedService.GetNewsAsync(1, 1, 20, null, null, null, to).Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(to: to);
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, null, to);
+    }
+
+    [Fact]
+    public async Task GetNews_ToBeforeFrom_Returns400BadRequest()
+    {
+        var from = new DateTimeOffset(2026, 8, 31, 0, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero); // to < from
+
+        var result = await _sut.GetNews(from: from, to: to);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetNews_FromEqualsTo_Returns200()
+    {
+        var sameDate = new DateTimeOffset(2026, 8, 15, 0, 0, 0, TimeSpan.Zero);
+        _feedService.GetNewsAsync(1, 1, 20, null, null, sameDate, sameDate).Returns(EmptyNewsPaged());
+
+        var result = await _sut.GetNews(from: sameDate, to: sameDate);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    // ── GET /api/v1/programs: 日付範囲フィルタ ──────────────────────────────
+
+    [Fact]
+    public async Task GetPrograms_WithFromAndTo_PassesDateRangeToService()
+    {
+        var from = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 8, 31, 23, 59, 59, TimeSpan.Zero);
+        _feedService.GetProgramsAsync(1, 1, 20, null, from, to).Returns(EmptyProgramsPaged());
+
+        await _sut.GetPrograms(from: from, to: to);
+
+        await _feedService.Received(1).GetProgramsAsync(1, 1, 20, null, from, to);
+    }
+
+    [Fact]
+    public async Task GetPrograms_ToBeforeFrom_Returns400BadRequest()
+    {
+        var from = new DateTimeOffset(2026, 8, 31, 0, 0, 0, TimeSpan.Zero);
+        var to = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero); // to < from
+
+        var result = await _sut.GetPrograms(from: from, to: to);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task GetPrograms_FromEqualsTo_Returns200()
+    {
+        var sameDate = new DateTimeOffset(2026, 8, 15, 0, 0, 0, TimeSpan.Zero);
+        _feedService.GetProgramsAsync(1, 1, 20, null, sameDate, sameDate).Returns(EmptyProgramsPaged());
+
+        var result = await _sut.GetPrograms(from: sameDate, to: sameDate);
+
+        Assert.IsType<OkObjectResult>(result);
+    }
+
     // ── GET /api/v1/programs: oshiId フィルタ ───────────────────────────────
 
     [Fact]

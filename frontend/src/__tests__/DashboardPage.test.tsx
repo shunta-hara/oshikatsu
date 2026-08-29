@@ -240,7 +240,14 @@ describe("DashboardPage", () => {
 
     await waitFor(() => {
       // oshiId=5 で getNews が呼ばれていることを確認
-      expect(mockGetNews).toHaveBeenCalledWith(1, 20, 5);
+      expect(mockGetNews).toHaveBeenCalledWith(
+        1,
+        20,
+        5,
+        undefined,
+        undefined,
+        undefined,
+      );
     });
   });
 

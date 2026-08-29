@@ -559,6 +559,178 @@ public class FeedServiceTests : IDisposable
         Assert.Equal(oshi1.Id, result.Items[0].OshiId);
     }
 
+    // ── GetNewsAsync: 日付範囲フィルタ ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetNewsAsync_WithFrom_ReturnsOnlyItemsAfterFrom()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "古い記事", publishedAt: now.AddDays(-5));
+        await CreateNewsItem(oshi, "新しい記事", publishedAt: now.AddDays(-1));
+
+        var from = now.AddDays(-3);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("新しい記事", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithTo_ReturnsOnlyItemsBeforeTo()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "古い記事", publishedAt: now.AddDays(-5));
+        await CreateNewsItem(oshi, "新しい記事", publishedAt: now.AddDays(-1));
+
+        var to = now.AddDays(-3);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, to: to);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("古い記事", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithFromAndTo_ReturnsOnlyItemsInRange()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "範囲外(古)", publishedAt: now.AddDays(-10));
+        await CreateNewsItem(oshi, "範囲内", publishedAt: now.AddDays(-5));
+        await CreateNewsItem(oshi, "範囲外(新)", publishedAt: now.AddDays(-1));
+
+        var from = now.AddDays(-7);
+        var to = now.AddDays(-3);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: from, to: to);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("範囲内", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithDateFilter_ExcludesNullPublishedAt()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "公開日なし", publishedAt: null);
+        await CreateNewsItem(oshi, "公開日あり", publishedAt: now);
+
+        var from = now.AddDays(-1);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("公開日あり", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_FromAfterAllItems_ReturnsEmpty()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "古い記事", publishedAt: now.AddDays(-10));
+
+        // 全アイテムより後の from → 空
+        var from = now.AddDays(1);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_ToBeforeAllItems_ReturnsEmpty()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "新しい記事", publishedAt: now);
+
+        // 全アイテムより前の to → 空
+        var to = now.AddDays(-10);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, to: to);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_NullFromAndTo_ReturnsAllItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "記事1", publishedAt: now.AddDays(-5));
+        await CreateNewsItem(oshi, "記事2（公開日なし）", publishedAt: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        // フィルタなし → PublishedAt 有無に関わらず全件
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    // ── GetProgramsAsync: 日付範囲フィルタ ─────────────────────────────────
+
+    [Fact]
+    public async Task GetProgramsAsync_WithFrom_ReturnsOnlyItemsAfterFrom()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateProgramAppearance(oshi, "古い番組", airedAt: now.AddDays(-5));
+        await CreateProgramAppearance(oshi, "新しい番組", airedAt: now.AddDays(-1));
+
+        var from = now.AddDays(-3);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("新しい番組", result.Items[0].ProgramName);
+    }
+
+    [Fact]
+    public async Task GetProgramsAsync_WithTo_ReturnsOnlyItemsBeforeTo()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateProgramAppearance(oshi, "古い番組", airedAt: now.AddDays(-5));
+        await CreateProgramAppearance(oshi, "新しい番組", airedAt: now.AddDays(-1));
+
+        var to = now.AddDays(-3);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, to: to);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("古い番組", result.Items[0].ProgramName);
+    }
+
+    [Fact]
+    public async Task GetProgramsAsync_WithDateFilter_ExcludesNullAiredAt()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateProgramAppearance(oshi, "放送日なし", airedAt: null);
+        await CreateProgramAppearance(oshi, "放送日あり", airedAt: now);
+
+        var from = now.AddDays(-1);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("放送日あり", result.Items[0].ProgramName);
+    }
+
+    [Fact]
+    public async Task GetProgramsAsync_WithFromAndTo_ReturnsOnlyItemsInRange()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateProgramAppearance(oshi, "範囲外(古)", airedAt: now.AddDays(-10));
+        await CreateProgramAppearance(oshi, "範囲内", airedAt: now.AddDays(-5));
+        await CreateProgramAppearance(oshi, "範囲外(新)", airedAt: now.AddDays(-1));
+
+        var from = now.AddDays(-7);
+        var to = now.AddDays(-3);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: from, to: to);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("範囲内", result.Items[0].ProgramName);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private async Task<OshikatsuApi.Entities.User> CreateUser(int userId, DateTime? lastViewedFeedAt)
@@ -598,7 +770,8 @@ public class FeedServiceTests : IDisposable
         Oshi oshi,
         string title,
         string? summary = null,
-        DateTimeOffset? collectedAt = null)
+        DateTimeOffset? collectedAt = null,
+        DateTimeOffset? publishedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
         var item = new NewsItem
@@ -608,6 +781,7 @@ public class FeedServiceTests : IDisposable
             Summary = summary,
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
+            PublishedAt = publishedAt,
             CreatedAt = now,
         };
         _db.NewsItems.Add(item);
@@ -618,7 +792,8 @@ public class FeedServiceTests : IDisposable
     private async Task<ProgramAppearance> CreateProgramAppearance(
         Oshi oshi,
         string programName,
-        DateTimeOffset? collectedAt = null)
+        DateTimeOffset? collectedAt = null,
+        DateTimeOffset? airedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
         var item = new ProgramAppearance
@@ -627,6 +802,7 @@ public class FeedServiceTests : IDisposable
             ProgramName = programName,
             SourceUrl = $"https://example.com/programs/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
+            AiredAt = airedAt,
             CreatedAt = now,
         };
         _db.ProgramAppearances.Add(item);

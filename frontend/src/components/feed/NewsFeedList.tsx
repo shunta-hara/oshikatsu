@@ -4,6 +4,7 @@ import { ApiError } from "../../api/client";
 import type { NewsItem, NewsPaginatedResponse } from "../../types/feed";
 import { FeedPagination } from "./FeedPagination";
 import { NewsSearchBox } from "./NewsSearchBox";
+import { DateRangeFilter } from "./DateRangeFilter";
 
 interface NewsFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しのニュースを表示する */
@@ -12,7 +13,7 @@ interface NewsFeedListProps {
 
 /**
  * ログインユーザーの推し全員分（または特定の推し）のニュース一覧を表示するコンポーネント。
- * ページネーション・エラー・空状態・キーワード検索を処理する。
+ * ページネーション・エラー・空状態・キーワード検索・日付範囲フィルタを処理する。
  */
 export function NewsFeedList({ oshiId }: NewsFeedListProps) {
   const [data, setData] = useState<NewsPaginatedResponse | null>(null);
@@ -21,15 +22,24 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
   const [error, setError] = useState<string | null>(null);
   /** コミット済み検索キーワード（「検索」ボタンを押したときに確定） */
   const [searchQuery, setSearchQuery] = useState("");
+  /** 適用済み開始日時（ISO 8601 UTC 文字列 or undefined） */
+  const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
+  /** 適用済み終了日時（ISO 8601 UTC 文字列 or undefined） */
+  const [dateTo, setDateTo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const fetchNews = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const result = searchQuery
-          ? await getNews(page, 20, oshiId, searchQuery)
-          : await getNews(page, 20, oshiId);
+        const result = await getNews(
+          page,
+          20,
+          oshiId,
+          searchQuery || undefined,
+          dateFrom,
+          dateTo,
+        );
         setData(result);
       } catch (err) {
         if (err instanceof ApiError) {
@@ -43,7 +53,7 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
     };
 
     void fetchNews();
-  }, [page, oshiId, searchQuery]);
+  }, [page, oshiId, searchQuery, dateFrom, dateTo]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -55,6 +65,17 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
     setPage(1);
   };
 
+  const handleDateApply = (
+    from: string | undefined,
+    to: string | undefined,
+  ) => {
+    setDateFrom(from);
+    setDateTo(to);
+    setPage(1);
+  };
+
+  const isFiltered = !!searchQuery || !!dateFrom || !!dateTo;
+
   return (
     <div>
       <NewsSearchBox
@@ -62,6 +83,7 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
         onSearch={handleSearch}
         onClear={handleClear}
       />
+      <DateRangeFilter onApply={handleDateApply} />
 
       {isLoading && <p>読み込み中...</p>}
 
@@ -73,7 +95,7 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
 
       {!isLoading && !error && data && data.items.length === 0 && (
         <p>
-          {searchQuery
+          {isFiltered
             ? "該当するニュースが見つかりません"
             : "まだニュース情報がありません"}
         </p>

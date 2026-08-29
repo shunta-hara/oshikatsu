@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProgramFeedList } from "../components/feed/ProgramFeedList";
 import * as feedApi from "../api/feed";
@@ -173,7 +174,9 @@ describe("ProgramFeedList", () => {
   // ── 異常系 ────────────────────────────────────────────────────────────
 
   it("APIエラー時にエラーメッセージが表示される", async () => {
-    mockGetPrograms.mockRejectedValue(new ApiError(500, "Internal Server Error"));
+    mockGetPrograms.mockRejectedValue(
+      new ApiError(500, "Internal Server Error"),
+    );
 
     render(<ProgramFeedList />);
 
@@ -214,5 +217,108 @@ describe("ProgramFeedList", () => {
     render(<ProgramFeedList />);
 
     expect(screen.getByText("読み込み中...")).toBeInTheDocument();
+  });
+
+  // ── 日付範囲フィルタ ──────────────────────────────────────────────────
+
+  it("日付範囲フィルタが表示される", async () => {
+    mockGetPrograms.mockResolvedValue(makeProgramsPage());
+
+    render(<ProgramFeedList />);
+
+    expect(screen.getByLabelText("開始日")).toBeInTheDocument();
+    expect(screen.getByLabelText("終了日")).toBeInTheDocument();
+  });
+
+  it("日付範囲を適用するとfrom/to付きでgetProgramsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    // 初回ロード
+    mockGetPrograms.mockResolvedValueOnce(makeProgramsPage());
+    // 日付フィルタ適用後
+    mockGetPrograms.mockResolvedValueOnce(makeProgramsPage());
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2026-08-01" },
+    });
+    fireEvent.change(screen.getByLabelText("終了日"), {
+      target: { value: "2026-08-31" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        "2026-08-01T00:00:00.000Z",
+        "2026-08-31T23:59:59.999Z",
+      );
+    });
+  });
+
+  it("日付範囲フィルタで0件のとき「該当する番組が見つかりません」が表示される", async () => {
+    const user = userEvent.setup();
+    // 初回ロード（全件）
+    mockGetPrograms.mockResolvedValueOnce(makeProgramsPage());
+    // 日付フィルタ後（0件）
+    mockGetPrograms.mockResolvedValueOnce(makeProgramsPage());
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2020-01-01" },
+    });
+    fireEvent.change(screen.getByLabelText("終了日"), {
+      target: { value: "2020-01-31" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("該当する番組が見つかりません"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("日付フィルタをクリアするとfrom/toなしでgetProgramsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    mockGetPrograms.mockResolvedValue(makeProgramsPage());
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2026-08-01" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenCalledTimes(2);
+    });
+
+    await user.click(screen.getByRole("button", { name: "クリア" }));
+
+    await waitFor(() => {
+      expect(mockGetPrograms).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
   });
 });

@@ -9,14 +9,22 @@ public interface IFeedService
     /// ユーザーの推し全員分（または特定の推し）のニュースを収集日時の新しい順でページネーション取得する。
     /// oshiId が指定された場合はその推しのニュースのみ返す。指定した oshiId がユーザーの推しでない場合は空を返す。
     /// query が指定された場合はタイトルまたは本文要約に対して部分一致で絞り込む。
+    /// from / to が指定された場合は PublishedAt による日付範囲フィルタを適用する（PublishedAt が null のアイテムは除外）。
     /// </summary>
-    Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(int userId, int page, int pageSize, int? oshiId = null, string? query = null);
+    Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(
+        int userId, int page, int pageSize,
+        int? oshiId = null, string? query = null,
+        DateTimeOffset? from = null, DateTimeOffset? to = null);
 
     /// <summary>
     /// ユーザーの推し全員分（または特定の推し）の出演番組を収集日時の新しい順でページネーション取得する。
     /// oshiId が指定された場合はその推しの番組のみ返す。指定した oshiId がユーザーの推しでない場合は空を返す。
+    /// from / to が指定された場合は AiredAt による日付範囲フィルタを適用する（AiredAt が null のアイテムは除外）。
     /// </summary>
-    Task<PaginatedResponseDto<ProgramAppearanceResponseDto>> GetProgramsAsync(int userId, int page, int pageSize, int? oshiId = null);
+    Task<PaginatedResponseDto<ProgramAppearanceResponseDto>> GetProgramsAsync(
+        int userId, int page, int pageSize,
+        int? oshiId = null,
+        DateTimeOffset? from = null, DateTimeOffset? to = null);
 
     /// <summary>
     /// ユーザーの前回閲覧日時以降に追加されたニュース・出演番組の合計件数を返す。

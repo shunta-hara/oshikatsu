@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NewsFeedList } from "../components/feed/NewsFeedList";
@@ -314,7 +314,14 @@ describe("NewsFeedList", () => {
     await user.click(screen.getByRole("button", { name: "検索" }));
 
     await waitFor(() => {
-      expect(mockGetNews).toHaveBeenCalledWith(1, 20, undefined, "テスト");
+      expect(mockGetNews).toHaveBeenCalledWith(
+        1,
+        20,
+        undefined,
+        "テスト",
+        undefined,
+        undefined,
+      );
     });
   });
 
@@ -388,7 +395,122 @@ describe("NewsFeedList", () => {
       expect(screen.getByText("全件表示のニュース")).toBeInTheDocument();
     });
 
-    // クリア後は query なしで呼ばれる
-    expect(mockGetNews).toHaveBeenLastCalledWith(1, 20, undefined);
+    // クリア後は query なしで呼ばれる（from/to も undefined）
+    expect(mockGetNews).toHaveBeenLastCalledWith(
+      1,
+      20,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
+  // ── 日付範囲フィルタ ──────────────────────────────────────────────────
+
+  it("日付範囲フィルタが表示される", async () => {
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    // 開始日・終了日の入力フィールドが存在する
+    expect(screen.getByLabelText("開始日")).toBeInTheDocument();
+    expect(screen.getByLabelText("終了日")).toBeInTheDocument();
+  });
+
+  it("日付範囲を適用するとfrom/to付きでgetNewsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    // 初回ロード
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // 日付フィルタ適用後
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2026-08-01" },
+    });
+    fireEvent.change(screen.getByLabelText("終了日"), {
+      target: { value: "2026-08-31" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        undefined,
+        "2026-08-01T00:00:00.000Z",
+        "2026-08-31T23:59:59.999Z",
+      );
+    });
+  });
+
+  it("日付フィルタをクリアするとfrom/toなしでgetNewsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    // 日付を入力してから適用
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2026-08-01" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledTimes(2);
+    });
+
+    // クリアする
+    await user.click(screen.getByRole("button", { name: "クリア" }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
+  it("日付範囲フィルタで0件のとき「該当するニュースが見つかりません」が表示される", async () => {
+    const user = userEvent.setup();
+    // 初回ロード（全件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // 日付フィルタ後（0件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    fireEvent.change(screen.getByLabelText("開始日"), {
+      target: { value: "2020-01-01" },
+    });
+    fireEvent.change(screen.getByLabelText("終了日"), {
+      target: { value: "2020-01-31" },
+    });
+    await user.click(screen.getByRole("button", { name: "期間を適用" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("該当するニュースが見つかりません"),
+      ).toBeInTheDocument();
+    });
   });
 });

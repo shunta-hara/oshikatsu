@@ -28,22 +28,33 @@ public class FeedController : ControllerBase
     /// <param name="pageSize">1ページあたりの件数（デフォルト20、最大100）</param>
     /// <param name="oshiId">絞り込む推しのID（省略時は全推し）</param>
     /// <param name="q">キーワード検索文字列。タイトルまたは本文要約に対して部分一致で絞り込む（省略時は全件）</param>
+    /// <param name="from">絞り込み開始日時（ISO 8601、例: 2026-08-01T00:00:00Z）。PublishedAt がこれ以降のニュースを返す。省略可</param>
+    /// <param name="to">絞り込み終了日時（ISO 8601、例: 2026-08-31T23:59:59Z）。PublishedAt がこれ以前のニュースを返す。省略可</param>
     /// <response code="200">ページネーション付きニュース一覧</response>
+    /// <response code="400">終了日時が開始日時より前（to &lt; from）</response>
     /// <response code="401">未認証</response>
     [HttpGet("news")]
     [ProducesResponseType(typeof(PaginatedResponseDto<NewsItemResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetNews(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize,
         [FromQuery] int? oshiId = null,
-        [FromQuery] string? q = null)
+        [FromQuery] string? q = null,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null)
     {
+        if (from.HasValue && to.HasValue && to.Value < from.Value)
+        {
+            return BadRequest(new MessageResponseDto { Message = "終了日時は開始日時以降の日付を指定してください" });
+        }
+
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > MaxPageSize) pageSize = DefaultPageSize;
 
         var userId = GetCurrentUserId();
-        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId, q);
+        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId, q, from, to);
         return Ok(result);
     }
 
@@ -51,21 +62,32 @@ public class FeedController : ControllerBase
     /// <param name="page">ページ番号（1起算）。1未満の値は1に正規化される</param>
     /// <param name="pageSize">1ページあたりの件数（デフォルト20、最大100）</param>
     /// <param name="oshiId">絞り込む推しのID（省略時は全推し）</param>
+    /// <param name="from">絞り込み開始日時（ISO 8601）。AiredAt がこれ以降の番組を返す。省略可</param>
+    /// <param name="to">絞り込み終了日時（ISO 8601）。AiredAt がこれ以前の番組を返す。省略可</param>
     /// <response code="200">ページネーション付き出演番組一覧</response>
+    /// <response code="400">終了日時が開始日時より前（to &lt; from）</response>
     /// <response code="401">未認証</response>
     [HttpGet("programs")]
     [ProducesResponseType(typeof(PaginatedResponseDto<ProgramAppearanceResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetPrograms(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize,
-        [FromQuery] int? oshiId = null)
+        [FromQuery] int? oshiId = null,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null)
     {
+        if (from.HasValue && to.HasValue && to.Value < from.Value)
+        {
+            return BadRequest(new MessageResponseDto { Message = "終了日時は開始日時以降の日付を指定してください" });
+        }
+
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > MaxPageSize) pageSize = DefaultPageSize;
 
         var userId = GetCurrentUserId();
-        var result = await _feedService.GetProgramsAsync(userId, page, pageSize, oshiId);
+        var result = await _feedService.GetProgramsAsync(userId, page, pageSize, oshiId, from, to);
         return Ok(result);
     }
 
