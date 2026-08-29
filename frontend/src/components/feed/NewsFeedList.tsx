@@ -5,6 +5,7 @@ import type { NewsItem, NewsPaginatedResponse } from "../../types/feed";
 import { FeedPagination } from "./FeedPagination";
 import { NewsSearchBox } from "./NewsSearchBox";
 import { DateRangeFilter } from "./DateRangeFilter";
+import { BookmarkButton } from "./BookmarkButton";
 
 interface NewsFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しのニュースを表示する */
@@ -124,6 +125,10 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
                     </time>
                   </p>
                   {item.summary && <p>{item.summary}</p>}
+                  <BookmarkButton
+                    newsItemId={item.id}
+                    initialIsBookmarked={item.isBookmarked ?? false}
+                  />
                 </article>
               </li>
             ))}

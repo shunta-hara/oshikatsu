@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<ProgramAppearance> ProgramAppearances => Set<ProgramAppearance>();
     public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
     public DbSet<CollectorJobLog> CollectorJobLogs => Set<CollectorJobLog>();
+    public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -136,6 +137,34 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(e => new { e.JobType, e.ExecutedAt })
                   .HasDatabaseName("ix_collector_job_logs_job_type_executed_at");
+        });
+
+        // ─── Bookmark ─────────────────────────────────────────────────────────
+        modelBuilder.Entity<Bookmark>(entity =>
+        {
+            entity.ToTable("bookmarks");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.NewsItemId).HasColumnName("news_item_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.NewsItem)
+                  .WithMany()
+                  .HasForeignKey(e => e.NewsItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.UserId, e.NewsItemId })
+                  .IsUnique()
+                  .HasDatabaseName("ix_bookmarks_user_id_news_item_id");
+
+            entity.HasIndex(e => e.UserId)
+                  .HasDatabaseName("ix_bookmarks_user_id");
         });
 
         // ─── RevokedToken ─────────────────────────────────────────────────────

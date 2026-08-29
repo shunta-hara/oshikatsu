@@ -22,6 +22,39 @@ namespace OshikatsuApi.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("OshikatsuApi.Entities.Bookmark", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("NewsItemId")
+                        .HasColumnType("integer")
+                        .HasColumnName("news_item_id");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_bookmarks_user_id");
+
+                    b.HasIndex("UserId", "NewsItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_bookmarks_user_id_news_item_id");
+
+                    b.ToTable("bookmarks", (string)null);
+                });
+
             modelBuilder.Entity("OshikatsuApi.Entities.CollectorJobLog", b =>
                 {
                     b.Property<int>("Id")
@@ -275,6 +308,25 @@ namespace OshikatsuApi.Migrations
                         .HasDatabaseName("ix_users_email");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("OshikatsuApi.Entities.Bookmark", b =>
+                {
+                    b.HasOne("OshikatsuApi.Entities.NewsItem", "NewsItem")
+                        .WithMany()
+                        .HasForeignKey("NewsItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("OshikatsuApi.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("NewsItem");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.NewsItem", b =>

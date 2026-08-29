@@ -11,6 +11,8 @@ export const newsItemSchema = z.object({
   publishedAt: z.string().datetime({ offset: true }).nullable(),
   isPublishedAtEstimated: z.boolean(),
   collectedAt: z.string().datetime({ offset: true }),
+  /** ログインユーザーがこの記事をブックマーク済みかどうか（未取得の場合は undefined）*/
+  isBookmarked: z.boolean().optional(),
 });
 
 export type NewsItem = z.infer<typeof newsItemSchema>;

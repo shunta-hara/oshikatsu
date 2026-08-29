@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthPage } from "./pages/AuthPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { BookmarkPage } from "./pages/BookmarkPage";
 
 export function App() {
   return (
@@ -15,6 +16,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/bookmarks"
+            element={
+              <ProtectedRoute>
+                <BookmarkPage />
               </ProtectedRoute>
             }
           />

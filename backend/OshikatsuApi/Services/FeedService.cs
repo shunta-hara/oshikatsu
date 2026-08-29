@@ -76,6 +76,14 @@ public class FeedService : IFeedService
             .Where(o => oshiIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name);
 
+        // ブックマーク済みIDセットを取得（現在ページのニュースのみ対象）
+        var rawItemIds = rawItems.Select(n => n.Id).ToList();
+        var bookmarkedIdsList = await _db.Bookmarks
+            .Where(b => b.UserId == userId && rawItemIds.Contains(b.NewsItemId))
+            .Select(b => b.NewsItemId)
+            .ToListAsync();
+        var bookmarkedIds = new HashSet<int>(bookmarkedIdsList);
+
         var items = rawItems.Select(n => new NewsItemResponseDto
         {
             Id = n.Id,
@@ -87,6 +95,7 @@ public class FeedService : IFeedService
             PublishedAt = n.PublishedAt,
             IsPublishedAtEstimated = n.IsPublishedAtEstimated,
             CollectedAt = n.CollectedAt,
+            IsBookmarked = bookmarkedIds.Contains(n.Id),
         }).ToList();
 
         return new PaginatedResponseDto<NewsItemResponseDto>

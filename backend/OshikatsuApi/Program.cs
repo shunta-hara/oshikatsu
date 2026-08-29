@@ -90,6 +90,9 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 // collector ジョブログサービス
 builder.Services.AddScoped<ICollectorJobLogService, CollectorJobLogService>();
 
+// ブックマークサービス
+builder.Services.AddScoped<IBookmarkService, BookmarkService>();
+
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 
