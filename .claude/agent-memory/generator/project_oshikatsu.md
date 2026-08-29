@@ -7,13 +7,13 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-7 実装完了（2026-07-14）。
+Sprint 1-12 実装完了（2026-08-29）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
 ## 実装済み内容
 
-### backend/（Sprint 1-6）
+### backend/（Sprint 1-6, 10-12）
 - `backend/OshikatsuApi.sln` — ソリューションファイル
 - `backend/OshikatsuApi/` — ASP.NET Core 10 Web API プロジェクト
   - EF Core + Npgsql で PostgreSQL 接続
@@ -23,22 +23,23 @@ Sprint 1-7 実装完了（2026-07-14）。
   - JWT 認証: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `POST /api/v1/auth/logout`
   - 推し管理: `POST/GET /api/v1/oshis`, `DELETE /api/v1/oshis/{id}`
   - collector 内部API: `POST /api/v1/internal/news`, `POST /api/v1/internal/programs`（APIキー認証）
+  - フィードAPI: `GET /api/v1/news`（oshiId・q クエリパラメータ対応）, `GET /api/v1/programs`（oshiId 対応）
+  - 未読API: `GET /api/v1/feed/unread-count`, `POST /api/v1/feed/mark-as-read`
+  - 収集ジョブ: `GET /api/v1/collector/status`, `POST /api/v1/internal/jobs`
   - **CORS 設定済み**: `http://localhost:5173` を許可（FrontendCorsPolicy）
-- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（103テスト合格）
+- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（189テスト合格）
 
-### frontend/（Sprint 7）
+### frontend/（Sprint 7-12）
 - `frontend/` — Vite + React + TypeScript プロジェクト
   - react-router-dom でルーティング。未認証は `/auth` へリダイレクト
-  - `src/types/auth.ts` — zod スキーマ + 型定義
+  - `src/types/auth.ts`, `src/types/oshi.ts`, `src/types/feed.ts`, `src/types/collector.ts` — zod スキーマ + 型定義
   - `src/api/client.ts` — fetch ラッパー（ApiError クラス、Bearer トークン自動付与）
-  - `src/api/auth.ts` — register / login / logout API 関数
-  - `src/context/AuthContext.tsx` — トークンを localStorage 管理する Context
-  - `src/components/ProtectedRoute.tsx` — 認証ガード
-  - `src/components/auth/LoginForm.tsx` — ログインフォーム
-  - `src/components/auth/RegisterForm.tsx` — 新規登録フォーム
-  - `src/pages/AuthPage.tsx` — ログイン/登録タブ切り替えページ
-  - `src/pages/DashboardPage.tsx` — ダッシュボード（ログアウトボタン付き）
-  - Vitest + RTL テスト 24件合格
+  - `src/api/auth.ts`, `src/api/oshi.ts`, `src/api/feed.ts`, `src/api/collector.ts` — API 関数
+  - `src/api/feed.ts` の `getNews` は `query` パラメータ対応（q クエリ付与）
+  - `src/components/feed/NewsSearchBox.tsx` — キーワード検索ボックス（Sprint 12 追加）
+  - `src/components/feed/NewsFeedList.tsx` — 検索状態管理・NewsSearchBox 統合（Sprint 12 更新）
+  - `src/components/feed/NotificationBadge.tsx` — 未読バッジ
+  - Vitest + RTL テスト 122件合格
 
 ## 環境の注意点
 
@@ -55,5 +56,6 @@ Sprint 1-7 実装完了（2026-07-14）。
 - **DateTimeOffset 使用**: NewsItem / ProgramAppearance の日時フィールドは `DateTimeOffset` を使用（DateTime だと Python の `+00:00` フォーマットが Npgsql に弾かれる）
 - **frontend テスト**: `vi.clearAllMocks()` は `mockOnce` キューをクリアしない。テスト間のモック汚染を防ぐには `vi.resetAllMocks()` を使う
 - **loading 状態テスト**: `userEvent` は内部で全マイクロタスクを flush するため async handler の中間状態テストには `fireEvent` が適切
+- **NewsFeedList 検索**: searchQuery が空のときは `getNews(page, 20, oshiId)` を呼ぶ（undefined を明示的に渡さない）。これにより既存テストの `toHaveBeenCalledWith(1, 20, 5)` が維持される
 
-**How to apply:** Sprint 8 以降の frontend テストでも `vi.resetAllMocks()` を使う。loading 状態テストは `fireEvent` を使う。
+**How to apply:** Sprint 13 以降の frontend テストでも `vi.resetAllMocks()` を使う。loading 状態テストは `fireEvent` を使う。

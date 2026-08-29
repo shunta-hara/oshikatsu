@@ -252,6 +252,49 @@ public class FeedControllerTests
         await _feedService.Received(1).GetNewsAsync(1, 1, 20, null);
     }
 
+    // ── GET /api/v1/news: q キーワード検索 ──────────────────────────────────
+
+    [Fact]
+    public async Task GetNews_WithQuery_PassesQueryToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, "テスト").Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(q: "テスト");
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, "テスト");
+    }
+
+    [Fact]
+    public async Task GetNews_WithQueryAndOshiId_PassesBothToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, 7, "キーワード").Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(oshiId: 7, q: "キーワード");
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, 7, "キーワード");
+    }
+
+    [Fact]
+    public async Task GetNews_WithQuery_Returns200()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, "テスト").Returns(EmptyNewsPaged());
+
+        var result = await _sut.GetNews(q: "テスト");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetNews_WithNullQuery_PassesNullQueryToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, null).Returns(EmptyNewsPaged());
+
+        await _sut.GetNews();
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null);
+    }
+
     // ── GET /api/v1/programs: oshiId フィルタ ───────────────────────────────
 
     [Fact]

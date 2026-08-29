@@ -283,4 +283,112 @@ describe("NewsFeedList", () => {
 
     expect(screen.getByText("読み込み中...")).toBeInTheDocument();
   });
+
+  // ── キーワード検索 ────────────────────────────────────────────────────
+
+  it("検索ボックスが表示される", async () => {
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    });
+  });
+
+  it("キーワードを入力して検索するとクエリ付きで getNews が呼ばれる", async () => {
+    const user = userEvent.setup();
+    // 初回ロード: 空
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // 検索後: 空（0件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    // 初回ロード完了を待つ
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    await user.type(screen.getByRole("searchbox"), "テスト");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledWith(1, 20, undefined, "テスト");
+    });
+  });
+
+  it("検索結果が0件のとき「該当するニュースが見つかりません」が表示される", async () => {
+    const user = userEvent.setup();
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    await user.type(screen.getByRole("searchbox"), "ヒットしないワード");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("該当するニュースが見つかりません"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("クリア後はクエリなしで getNews が呼ばれ全件一覧に戻る", async () => {
+    const user = userEvent.setup();
+    // 初回ロード
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // 検索後（0件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // クリア後（全件）
+    mockGetNews.mockResolvedValueOnce(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "全件表示のニュース",
+            summary: null,
+            sourceUrl: "https://example.com/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-08-29T10:00:00+09:00",
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    // 検索する
+    await user.type(screen.getByRole("searchbox"), "テスト");
+    await user.click(screen.getByRole("button", { name: "検索" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("該当するニュースが見つかりません"),
+      ).toBeInTheDocument();
+    });
+
+    // クリアする
+    await user.click(screen.getByRole("button", { name: "検索をクリア" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("全件表示のニュース")).toBeInTheDocument();
+    });
+
+    // クリア後は query なしで呼ばれる
+    expect(mockGetNews).toHaveBeenLastCalledWith(1, 20, undefined);
+  });
 });

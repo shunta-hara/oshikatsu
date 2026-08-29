@@ -27,6 +27,7 @@ public class FeedController : ControllerBase
     /// <param name="page">ページ番号（1起算）。1未満の値は1に正規化される</param>
     /// <param name="pageSize">1ページあたりの件数（デフォルト20、最大100）</param>
     /// <param name="oshiId">絞り込む推しのID（省略時は全推し）</param>
+    /// <param name="q">キーワード検索文字列。タイトルまたは本文要約に対して部分一致で絞り込む（省略時は全件）</param>
     /// <response code="200">ページネーション付きニュース一覧</response>
     /// <response code="401">未認証</response>
     [HttpGet("news")]
@@ -35,13 +36,14 @@ public class FeedController : ControllerBase
     public async Task<IActionResult> GetNews(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = DefaultPageSize,
-        [FromQuery] int? oshiId = null)
+        [FromQuery] int? oshiId = null,
+        [FromQuery] string? q = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > MaxPageSize) pageSize = DefaultPageSize;
 
         var userId = GetCurrentUserId();
-        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId);
+        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId, q);
         return Ok(result);
     }
 

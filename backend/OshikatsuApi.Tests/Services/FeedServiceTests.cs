@@ -466,6 +466,99 @@ public class FeedServiceTests : IDisposable
         Assert.Equal(0, countAfter);
     }
 
+    // ── GetNewsAsync: キーワード検索 ─────────────────────────────────────────
+
+    [Fact]
+    public async Task GetNewsAsync_WithKeywordMatchingTitle_ReturnsMatchingItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "Pythonについて");
+        await CreateNewsItem(oshi, "Javaの最新情報");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Single(result.Items);
+        Assert.Equal("Pythonについて", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithKeywordMatchingSummary_ReturnsMatchingItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "ニュース1", summary: "Pythonが人気");
+        await CreateNewsItem(oshi, "ニュース2", summary: "Javaが話題");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("ニュース1", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithKeywordMatchingTitleOrSummary_ReturnsBothMatches()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "Pythonについて", summary: null);
+        await CreateNewsItem(oshi, "別の記事", summary: "Python事例紹介");
+        await CreateNewsItem(oshi, "Javaの最新情報", summary: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithKeywordNotMatching_ReturnsEmpty()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "Javaの最新情報", summary: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithNullQuery_ReturnsAllItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "ニュース1");
+        await CreateNewsItem(oshi, "ニュース2");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: null);
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithWhitespaceQuery_ReturnsAllItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "ニュース1");
+
+        // 空白のみのクエリはフィルタなしとして扱う
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "   ");
+
+        Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithKeywordAndOshiId_FiltersBothCriteria()
+    {
+        var oshi1 = await CreateOshi(userId: 1, name: "推しA");
+        var oshi2 = await CreateOshi(userId: 1, name: "推しB");
+        await CreateNewsItem(oshi1, "Pythonニュース");
+        await CreateNewsItem(oshi2, "Pythonニュース");
+
+        // oshi1 + "Python" キーワードで絞り込むと oshi1 の1件のみ
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: oshi1.Id, query: "Python");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(oshi1.Id, result.Items[0].OshiId);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private async Task<OshikatsuApi.Entities.User> CreateUser(int userId, DateTime? lastViewedFeedAt)
@@ -504,6 +597,7 @@ public class FeedServiceTests : IDisposable
     private async Task<NewsItem> CreateNewsItem(
         Oshi oshi,
         string title,
+        string? summary = null,
         DateTimeOffset? collectedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
@@ -511,6 +605,7 @@ public class FeedServiceTests : IDisposable
         {
             OshiId = oshi.Id,
             Title = title,
+            Summary = summary,
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
             CreatedAt = now,

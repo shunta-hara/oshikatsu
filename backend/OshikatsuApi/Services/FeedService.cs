@@ -16,7 +16,7 @@ public class FeedService : IFeedService
 
     /// <inheritdoc />
     public async Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(
-        int userId, int page, int pageSize, int? oshiId = null)
+        int userId, int page, int pageSize, int? oshiId = null, string? query = null)
     {
         // ユーザーの推し ID 一覧を取得（サブクエリよりも InMemory・SQL 両対応しやすい）
         var oshiIds = await _db.Oshis
@@ -40,12 +40,20 @@ public class FeedService : IFeedService
             oshiIds = [oshiId.Value];
         }
 
-        var query = _db.NewsItems
-            .Where(n => oshiIds.Contains(n.OshiId))
-            .OrderByDescending(n => n.CollectedAt);
+        var newsQuery = _db.NewsItems.Where(n => oshiIds.Contains(n.OshiId));
 
-        var total = await query.CountAsync();
-        var rawItems = await query
+        // キーワード検索: タイトルまたは本文要約に対して部分一致で絞り込む
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            newsQuery = newsQuery.Where(n =>
+                n.Title.Contains(query) ||
+                (n.Summary != null && n.Summary.Contains(query)));
+        }
+
+        var orderedQuery = newsQuery.OrderByDescending(n => n.CollectedAt);
+
+        var total = await orderedQuery.CountAsync();
+        var rawItems = await orderedQuery
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();

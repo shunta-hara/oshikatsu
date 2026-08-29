@@ -8,8 +8,9 @@ public interface IFeedService
     /// <summary>
     /// ユーザーの推し全員分（または特定の推し）のニュースを収集日時の新しい順でページネーション取得する。
     /// oshiId が指定された場合はその推しのニュースのみ返す。指定した oshiId がユーザーの推しでない場合は空を返す。
+    /// query が指定された場合はタイトルまたは本文要約に対して部分一致で絞り込む。
     /// </summary>
-    Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(int userId, int page, int pageSize, int? oshiId = null);
+    Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(int userId, int page, int pageSize, int? oshiId = null, string? query = null);
 
     /// <summary>
     /// ユーザーの推し全員分（または特定の推し）の出演番組を収集日時の新しい順でページネーション取得する。

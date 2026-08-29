@@ -12,10 +12,14 @@ export async function getNews(
   page: number = 1,
   pageSize: number = 20,
   oshiId?: number,
+  query?: string,
 ): Promise<NewsPaginatedResponse> {
   let url = `/news?page=${page}&pageSize=${pageSize}`;
   if (oshiId !== undefined) {
     url += `&oshiId=${oshiId}`;
+  }
+  if (query !== undefined && query !== "") {
+    url += `&q=${encodeURIComponent(query)}`;
   }
   const raw = await apiFetch<unknown>(url);
   return newsPaginatedSchema.parse(raw);
