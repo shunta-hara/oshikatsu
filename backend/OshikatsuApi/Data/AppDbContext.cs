@@ -165,6 +165,9 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(e => e.UserId)
                   .HasDatabaseName("ix_bookmarks_user_id");
+
+            entity.HasIndex(e => e.NewsItemId)
+                  .HasDatabaseName("ix_bookmarks_news_item_id");
         });
 
         // ─── RevokedToken ─────────────────────────────────────────────────────
