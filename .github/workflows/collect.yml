@@ -5,6 +5,17 @@ on:
     # 6時間ごとに実行（UTC 0:00 / 6:00 / 12:00 / 18:00）
     - cron: '0 0,6,12,18 * * *'
   workflow_dispatch:
+    inputs:
+      oshi_id:
+        description: '特定の推しのみ収集する場合に推し ID（数字）を指定する。空の場合は全推し対象。'
+        required: false
+        default: ''
+
+# 全体収集（oshi_id なし）は同時実行しない。
+# 特定推しの収集は同じ推し ID どうしのみ同時実行しない（異なる推しは独立して動く）。
+concurrency:
+  group: ${{ inputs.oshi_id != '' && format('collect-oshi-{0}', inputs.oshi_id) || 'collect-all' }}
+  cancel-in-progress: false
 
 jobs:
   collect:
@@ -30,5 +41,6 @@ jobs:
         env:
           BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
           COLLECTOR_API_KEY: ${{ secrets.COLLECTOR_API_KEY }}
+          OSHI_ID: ${{ inputs.oshi_id }}
         run: python -m collector
         working-directory: collector

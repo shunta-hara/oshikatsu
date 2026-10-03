@@ -17,6 +17,7 @@ class CollectorConfig:
             os.environ.get("REQUEST_TIMEOUT_SECONDS", "30")
         )
         self.max_retries: int = int(os.environ.get("MAX_RETRIES", "3"))
+        self.oshi_id: int | None = self._parse_optional_int("OSHI_ID")
 
     @staticmethod
     def _require(key: str) -> str:
@@ -27,6 +28,23 @@ class CollectorConfig:
                 f"Required environment variable '{key}' is not set or empty."
             )
         return value
+
+    @staticmethod
+    def _parse_optional_int(key: str) -> int | None:
+        """
+        オプションの整数環境変数を取得する。
+        未設定・空文字は None を返す。
+        設定されているが整数でない場合は ValueError を送出する。
+        """
+        value = os.environ.get(key, "").strip()
+        if not value:
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            raise ValueError(
+                f"Environment variable '{key}' must be an integer, got: {value!r}"
+            )
 
 
 def load_config() -> CollectorConfig:

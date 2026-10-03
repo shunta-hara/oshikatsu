@@ -7,11 +7,17 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-22 実装完了（Sprint 22: 2026-10-03）。
+Sprint 1-23 実装完了（Sprint 23: 2026-10-03）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
 ## 実装済み内容
+
+### collector/（Sprint 23）
+- **一括送信（FEAT-025）**: `post_news_batch` / `post_program_batch` メソッド追加。推し1人分を1回のAPIコールで送信。
+- **単一推し収集モード（FEAT-025）**: `OSHI_ID` 環境変数で特定の推しのみ収集可能。非整数は config でエラー終了。存在しない ID は警告ログ + 正常終了。
+- **番組重複フィルタ（FEAT-024）**: `PROGRAM_KEYWORDS` 定数による候補絞り込み。同実行のニュース URL との重複除外。
+- **workflow 更新（FEAT-025）**: `workflow_dispatch` に `oshi_id` 入力追加。concurrency グループで全体実行と特定推し実行を分離。
 
 ### backend/（Sprint 1-6, 10-16, 20, 22）
 - `backend/OshikatsuApi.sln` — ソリューションファイル

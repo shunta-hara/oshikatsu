@@ -28,6 +28,37 @@ class OshiInfo:
     name: str
 
 
+@dataclass
+class BatchResult:
+    """一括登録 API のレスポンス"""
+
+    received_count: int
+    saved_count: int
+    skipped_count: int
+
+
+@dataclass
+class NewsBatchItem:
+    """ニュース一括登録の1アイテム"""
+
+    title: str
+    source_url: str
+    collected_at: datetime
+    summary: str | None = None
+    published_at: datetime | None = None
+
+
+@dataclass
+class ProgramBatchItem:
+    """出演番組一括登録の1アイテム"""
+
+    program_name: str
+    source_url: str
+    collected_at: datetime
+    broadcaster: str | None = None
+    aired_at: datetime | None = None
+
+
 class BackendClient:
     """backend 内部 API への HTTP クライアント。"""
 
@@ -82,7 +113,7 @@ class BackendClient:
         published_at: datetime | None = None,
     ) -> dict[str, Any]:
         """
-        ニュースアイテムを backend に送信する。
+        ニュースアイテムを backend に送信する（単件 API、後方互換のために残す）。
 
         published_at が None の場合は backend 側で collected_at で代替され、
         is_published_at_estimated が True になる。
@@ -99,6 +130,39 @@ class BackendClient:
             payload["publishedAt"] = _to_iso(published_at)
 
         return self._post_with_retry("/api/v1/internal/news", payload)
+
+    def post_news_batch(
+        self,
+        *,
+        oshi_id: int,
+        items: list[NewsBatchItem],
+    ) -> BatchResult:
+        """
+        ニュースを一括登録する。
+
+        各アイテムを backend の一括登録 API に送信する。
+        重複 sourceUrl はサーバー側でスキップされる。
+        """
+        items_payload: list[dict[str, Any]] = []
+        for item in items:
+            entry: dict[str, Any] = {
+                "title": item.title,
+                "sourceUrl": item.source_url,
+                "collectedAt": _to_iso(item.collected_at),
+            }
+            if item.summary is not None:
+                entry["summary"] = item.summary
+            if item.published_at is not None:
+                entry["publishedAt"] = _to_iso(item.published_at)
+            items_payload.append(entry)
+
+        payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}
+        raw = self._post_with_retry("/api/v1/internal/news/batch", payload)
+        return BatchResult(
+            received_count=raw.get("receivedCount", 0),
+            saved_count=raw.get("savedCount", 0),
+            skipped_count=raw.get("skippedCount", 0),
+        )
 
     def post_job_log(
         self,
@@ -132,7 +196,7 @@ class BackendClient:
         aired_at: datetime | None = None,
     ) -> dict[str, Any]:
         """
-        出演番組情報を backend に送信する。
+        出演番組情報を backend に送信する（単件 API、後方互換のために残す）。
 
         aired_at が None の場合は backend 側で collected_at で代替され、
         is_aired_at_estimated が True になる。
@@ -149,6 +213,39 @@ class BackendClient:
             payload["airedAt"] = _to_iso(aired_at)
 
         return self._post_with_retry("/api/v1/internal/programs", payload)
+
+    def post_program_batch(
+        self,
+        *,
+        oshi_id: int,
+        items: list[ProgramBatchItem],
+    ) -> BatchResult:
+        """
+        出演番組情報を一括登録する。
+
+        各アイテムを backend の一括登録 API に送信する。
+        重複 sourceUrl はサーバー側でスキップされる。
+        """
+        items_payload: list[dict[str, Any]] = []
+        for item in items:
+            entry: dict[str, Any] = {
+                "programName": item.program_name,
+                "sourceUrl": item.source_url,
+                "collectedAt": _to_iso(item.collected_at),
+            }
+            if item.broadcaster is not None:
+                entry["broadcaster"] = item.broadcaster
+            if item.aired_at is not None:
+                entry["airedAt"] = _to_iso(item.aired_at)
+            items_payload.append(entry)
+
+        payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}
+        raw = self._post_with_retry("/api/v1/internal/programs/batch", payload)
+        return BatchResult(
+            received_count=raw.get("receivedCount", 0),
+            saved_count=raw.get("savedCount", 0),
+            skipped_count=raw.get("skippedCount", 0),
+        )
 
     def check_health(self) -> bool:
         """

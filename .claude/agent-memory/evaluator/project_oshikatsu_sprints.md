@@ -5,11 +5,30 @@ metadata:
   type: project
 ---
 
-Sprint 22 評価完了（合格、2回目）。FEAT-023（一括登録API）・FEAT-024（番組重複backend対策）両方合格。
+Sprint 23 評価完了（合格、1回目）。FEAT-025（collector一括送信・単一推し収集モード）・FEAT-024（番組重複collector対策）両方合格。167/167 全テスト通過。
 
-**Why:** Sprint 22はFEAT-023+FEAT-024(backend)。1回目不合格→単件 programs API が news URL をスキップしない問題を修正→2回目合格。
+**Why:** Sprint 23はFEAT-025+FEAT-024(collector)。全完了条件14/14達成。
 
-**How to apply:** Sprint 22合格。次は Sprint 23（collector 一括送信・番組重複 collector 対策）。
+**How to apply:** Sprint 23合格。次は Sprint 24（推し登録直後の即時収集・frontend の表記変更）。
+
+## Sprint 23 評価 (2026-10-03): 合格（1回目）
+
+- 対象: FEAT-025（collector一括送信・単一推し収集モード）・FEAT-024（番組重複のcollector対策）
+- 結果: **合格**
+- ビルド: docker build 成功（CACHED）
+- テスト: 167/167 PASS
+
+### 全動的テスト
+- OSHI_ID=abc → exit 1 + stderr "Configuration error" ✅
+- OSHI_ID=9999 → WARNING log + exit 0 ✅
+- OSHI_ID=1 → 1推しのみ収集・ジョブログ2件送信 ✅
+- batch POST直接テスト: `{"receivedCount":1,"savedCount":1,"skippedCount":0}` ✅
+- collect.yml: cron 6時間、env 経由 OSHI_ID、concurrency (collect-all / collect-oshi-{id}) ✅
+
+### 技術メモ
+- program_collector.py: `PROGRAM_KEYWORDS` リストは L21 の1か所で管理
+- main.py: `news_urls_by_oshi` dict を run_news_collection → run_program_collection へ渡す設計
+- collector/collector/__main__.py 存在確認済み（python -m collector 動作）
 
 ## Sprint 22 評価 (2026-10-03): 合格（2回目）
 

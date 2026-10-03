@@ -7,7 +7,15 @@ from unittest.mock import MagicMock
 import pytest
 import responses as resp
 
-from collector.client import BackendClient, OshiInfo, _backoff, _to_iso
+from collector.client import (
+    BackendClient,
+    BatchResult,
+    NewsBatchItem,
+    OshiInfo,
+    ProgramBatchItem,
+    _backoff,
+    _to_iso,
+)
 from collector.config import CollectorConfig
 
 
@@ -470,6 +478,266 @@ class TestCheckHealth:
         assert result is False
         # リトライしないので1回だけ呼ばれる
         assert len(resp.calls) == 1
+
+
+class TestPostNewsBatch:
+    NEWS_BATCH_URL = "http://backend:8080/api/v1/internal/news/batch"
+
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_news_batch_returns_batch_result(self) -> None:
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 2, "savedCount": 2, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            NewsBatchItem(title="記事1", source_url="https://example.com/1", collected_at=_NOW),
+            NewsBatchItem(title="記事2", source_url="https://example.com/2", collected_at=_NOW),
+        ]
+
+        result = client.post_news_batch(oshi_id=1, items=items)
+
+        assert isinstance(result, BatchResult)
+        assert result.received_count == 2
+        assert result.saved_count == 2
+        assert result.skipped_count == 0
+
+    @resp.activate
+    def test_post_news_batch_sends_api_key_header(self) -> None:
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config(api_key="batch-key"))
+        items = [NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)]
+
+        client.post_news_batch(oshi_id=1, items=items)
+
+        assert resp.calls[0].request.headers["X-Api-Key"] == "batch-key"
+
+    @resp.activate
+    def test_post_news_batch_sends_correct_payload_structure(self) -> None:
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            NewsBatchItem(
+                title="テスト記事",
+                source_url="https://example.com/1",
+                collected_at=_NOW,
+                summary="要約",
+                published_at=datetime(2026, 7, 14, 10, 0, 0, tzinfo=timezone.utc),
+            )
+        ]
+
+        client.post_news_batch(oshi_id=5, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        assert body["oshiId"] == 5
+        assert len(body["items"]) == 1
+        assert body["items"][0]["title"] == "テスト記事"
+        assert body["items"][0]["sourceUrl"] == "https://example.com/1"
+        assert body["items"][0]["summary"] == "要約"
+        assert "publishedAt" in body["items"][0]
+        assert "collectedAt" in body["items"][0]
+
+    @resp.activate
+    def test_post_news_batch_omits_optional_fields_when_none(self) -> None:
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)
+        ]
+
+        client.post_news_batch(oshi_id=1, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        item = body["items"][0]
+        assert "summary" not in item
+        assert "publishedAt" not in item
+
+    # ── 異常系・リトライ ──────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_news_batch_retries_on_500(self) -> None:
+        resp.add(resp.POST, self.NEWS_BATCH_URL, json={}, status=500)
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config(max_retries=3))
+        items = [NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)]
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.post_news_batch(oshi_id=1, items=items)
+
+        assert result.saved_count == 1
+        assert len(resp.calls) == 2
+
+    @resp.activate
+    def test_post_news_batch_raises_after_max_retries(self) -> None:
+        for _ in range(3):
+            resp.add(resp.POST, self.NEWS_BATCH_URL, json={}, status=500)
+        client = BackendClient(make_config(max_retries=3))
+        items = [NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)]
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            with pytest.raises(RuntimeError, match="failed after 3 attempts"):
+                client.post_news_batch(oshi_id=1, items=items)
+
+
+class TestPostProgramBatch:
+    PROGRAM_BATCH_URL = "http://backend:8080/api/v1/internal/programs/batch"
+
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_program_batch_returns_batch_result(self) -> None:
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="テスト番組",
+                source_url="https://tv.example.com/1",
+                collected_at=_NOW,
+            )
+        ]
+
+        result = client.post_program_batch(oshi_id=1, items=items)
+
+        assert isinstance(result, BatchResult)
+        assert result.received_count == 1
+        assert result.saved_count == 1
+        assert result.skipped_count == 0
+
+    @resp.activate
+    def test_post_program_batch_sends_correct_payload_structure(self) -> None:
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="番組名",
+                source_url="https://tv.example.com/1",
+                collected_at=_NOW,
+                broadcaster="NHK",
+                aired_at=datetime(2026, 7, 14, 20, 0, 0, tzinfo=timezone.utc),
+            )
+        ]
+
+        client.post_program_batch(oshi_id=3, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        assert body["oshiId"] == 3
+        assert len(body["items"]) == 1
+        assert body["items"][0]["programName"] == "番組名"
+        assert body["items"][0]["sourceUrl"] == "https://tv.example.com/1"
+        assert body["items"][0]["broadcaster"] == "NHK"
+        assert "airedAt" in body["items"][0]
+        assert "collectedAt" in body["items"][0]
+
+    @resp.activate
+    def test_post_program_batch_omits_optional_fields_when_none(self) -> None:
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="番組",
+                source_url="https://tv.example.com/1",
+                collected_at=_NOW,
+            )
+        ]
+
+        client.post_program_batch(oshi_id=1, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        item = body["items"][0]
+        assert "broadcaster" not in item
+        assert "airedAt" not in item
+
+    @resp.activate
+    def test_post_program_batch_retries_on_429(self) -> None:
+        resp.add(resp.POST, self.PROGRAM_BATCH_URL, json={}, status=429)
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config(max_retries=3))
+        items = [
+            ProgramBatchItem(
+                program_name="番組",
+                source_url="https://tv.example.com/1",
+                collected_at=_NOW,
+            )
+        ]
+
+        import unittest.mock as mock
+        with mock.patch("collector.client.time.sleep"):
+            result = client.post_program_batch(oshi_id=1, items=items)
+
+        assert result.saved_count == 1
+        assert len(resp.calls) == 2
+
+    # ── 重複処理 ─────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_post_program_batch_handles_skipped_count(self) -> None:
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 2, "savedCount": 1, "skippedCount": 1},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(program_name="番組A", source_url="https://tv.example.com/1", collected_at=_NOW),
+            ProgramBatchItem(program_name="番組B", source_url="https://tv.example.com/2", collected_at=_NOW),
+        ]
+
+        result = client.post_program_batch(oshi_id=1, items=items)
+
+        assert result.received_count == 2
+        assert result.saved_count == 1
+        assert result.skipped_count == 1
 
 
 class TestHelpers:
