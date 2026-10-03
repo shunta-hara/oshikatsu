@@ -1,3 +1,3 @@
 # Evaluator Agent Memory Index
 
-- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — 全21スプリント評価完了。Sprint 21（FEAT-022: GitHub Actions+コールドスタート対策）合格で全スプリント終了
+- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — Sprint 22（FEAT-023+024 backend）合格（2回目）。332/332 全テスト通過

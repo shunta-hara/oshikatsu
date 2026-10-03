@@ -41,8 +41,10 @@ public class DashboardService : IDashboardService
             .ToDictionary(g => g.Key, g => g.First());
 
         // クエリ 3: 全推しの出演番組を収集日時降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
+        // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外
         var programItems = await _db.ProgramAppearances
             .Where(p => oshiIds.Contains(p.OshiId))
+            .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl))
             .OrderByDescending(p => p.CollectedAt)
             .ToListAsync();
 

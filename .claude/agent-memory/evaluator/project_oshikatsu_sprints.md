@@ -5,11 +5,35 @@ metadata:
   type: project
 ---
 
-Sprint 21 評価完了（合格）。FEAT-022（collectorのGitHub Actions定期実行・コールドスタート対策）の全必須観点が合格。全21スプリント完了。
+Sprint 22 評価完了（合格、2回目）。FEAT-023（一括登録API）・FEAT-024（番組重複backend対策）両方合格。
 
-**Why:** FEAT-001〜022をカバーするために21スプリントが計画・実施された。Sprint 21が最終スプリント。
+**Why:** Sprint 22はFEAT-023+FEAT-024(backend)。1回目不合格→単件 programs API が news URL をスキップしない問題を修正→2回目合格。
 
-**How to apply:** 全スプリント完了。新規機能追加時は新仕様書から再プランニングする。
+**How to apply:** Sprint 22合格。次は Sprint 23（collector 一括送信・番組重複 collector 対策）。
+
+## Sprint 22 評価 (2026-10-03): 合格（2回目）
+
+- 対象: FEAT-023（一括登録API）・FEAT-024（番組重複のbackend対策）
+- 結果: **合格**
+- ビルド: 成功（0エラー）
+- テスト: 332/332 PASS
+
+### 修正確認
+- FIX 1: `CreateProgramAppearanceAsync` に news URL チェック追加（id:0, wasDuplicate:true で返す）✅
+- FIX 2: `DbUpdateException` catch を `IsUniqueConstraintViolation` (SqlState==23505) に絞る ✅
+
+### 23505 でスキップ時の挙動（受け入れ可能）
+- 23505 発生時は同バッチ内の非衝突アイテムも全スキップ扱いになる
+- 仕様は「concurrent で 500 にならない（片方はスキップ扱い）」のみ要求→満たしている
+- collector リトライで次回収集可能なため受け入れ可能
+
+### 全動的テスト
+- POST /news/batch, /programs/batch 正常系・400/404・重複スキップ ✅
+- programs/batch が同推し news URL をスキップ（FEAT-024） ✅
+- 単件 programs API が news URL をスキップ（FEAT-024 FIX 1） ✅
+- programs 一覧・dashboard で news 重複 URL の番組除外 ✅
+- Swagger に batch エンドポイント反映 ✅
+- 並列3リクエストで 500 にならない ✅
 
 ## Sprint 21 評価 (2026-10-03): 合格
 

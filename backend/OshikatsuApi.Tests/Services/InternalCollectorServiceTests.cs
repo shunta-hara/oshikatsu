@@ -375,6 +375,50 @@ public class InternalCollectorServiceTests : IDisposable
         Assert.Empty(result);
     }
 
+    // ── CreateProgramAppearanceAsync: FEAT-024 ニュース URL との重複 ──────────
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameOshi_ReturnsWasDuplicateTrue()
+    {
+        // 事前に同 URL のニュースを保存
+        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/both");
+        await _sut.CreateNewsItemAsync(newsDto);
+
+        // 同 URL で番組を登録しようとする
+        var progDto = BuildProgramDto(oshiId: 1, sourceUrl: "https://example.com/both");
+        var result = await _sut.CreateProgramAppearanceAsync(progDto);
+
+        Assert.True(result.WasDuplicate);
+    }
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameOshi_DoesNotSaveProgram()
+    {
+        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news-dup");
+        await _sut.CreateNewsItemAsync(newsDto);
+
+        var progDto = BuildProgramDto(oshiId: 1, sourceUrl: "https://example.com/news-dup");
+        await _sut.CreateProgramAppearanceAsync(progDto);
+
+        var count = await _db.ProgramAppearances.CountAsync();
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_UrlInNewsOfDifferentOshi_SavesProgram()
+    {
+        // 別の推しのニュースと URL が同じでも保存される
+        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/cross");
+        await _sut.CreateNewsItemAsync(newsDto);
+
+        // oshi=2 の番組（oshi=1 のニュースとは別推し）
+        var progDto = BuildProgramDto(oshiId: 2, sourceUrl: "https://example.com/cross");
+        var result = await _sut.CreateProgramAppearanceAsync(progDto);
+
+        Assert.False(result.WasDuplicate);
+        Assert.Equal(1, await _db.ProgramAppearances.CountAsync());
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private CreateNewsItemRequestDto BuildNewsDto(

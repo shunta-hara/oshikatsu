@@ -140,6 +140,10 @@ public class FeedService : IFeedService
 
         var programsQuery = _db.ProgramAppearances.Where(p => oshiIds.Contains(p.OshiId));
 
+        // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外（DBからは削除しない）
+        programsQuery = programsQuery
+            .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl));
+
         // 日付範囲フィルタ: 放送日時（AiredAt）で絞り込む。
         // AiredAt が null のアイテムはフィルタ適用時に除外される。
         // Npgsql は UTC 以外のオフセット付き DateTimeOffset をクエリパラメータとして使えないため

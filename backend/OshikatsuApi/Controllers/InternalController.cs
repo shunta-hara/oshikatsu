@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using OshikatsuApi.Authentication;
 using OshikatsuApi.DTOs;
+using OshikatsuApi.Exceptions;
 using OshikatsuApi.Services;
 
 namespace OshikatsuApi.Controllers;
@@ -71,6 +72,70 @@ public class InternalController : ControllerBase
     {
         var result = await _collectorService.CreateProgramAppearanceAsync(dto);
         return Ok(result);
+    }
+
+    /// <summary>ニュースアイテムを一括登録する（重複ソースURL・同推しのニュース既存URLは無視）</summary>
+    /// <remarks>
+    /// <para>リクエスト内で重複する sourceUrl は最初の出現のみ保存する。</para>
+    /// <para>同一の oshiId + sourceUrl が既に存在する場合もスキップされる。</para>
+    /// </remarks>
+    /// <response code="200">一括登録結果（受信件数・保存件数・スキップ件数）</response>
+    /// <response code="400">items が空または200件超、必須項目不足</response>
+    /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した oshiId が存在しない</response>
+    [HttpPost("news/batch")]
+    [ProducesResponseType(typeof(BatchResultResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BatchCreateNews([FromBody] BatchCreateNewsRequestDto dto)
+    {
+        if (dto.Items == null || dto.Items.Count == 0)
+            return BadRequest(new MessageResponseDto { Message = "items は1件以上必要です。" });
+        if (dto.Items.Count > 200)
+            return BadRequest(new MessageResponseDto { Message = "items は200件以下で送信してください。" });
+
+        try
+        {
+            var result = await _collectorService.BatchCreateNewsItemsAsync(dto);
+            return Ok(result);
+        }
+        catch (OshiNotFoundException)
+        {
+            return NotFound(new MessageResponseDto { Message = "指定した oshiId が見つかりません。" });
+        }
+    }
+
+    /// <summary>出演番組情報を一括登録する（重複ソースURL・同推しのニュース既存URLは無視）</summary>
+    /// <remarks>
+    /// <para>リクエスト内で重複する sourceUrl は最初の出現のみ保存する。</para>
+    /// <para>同一の oshiId + sourceUrl が既に番組または同推しのニュースに存在する場合もスキップされる（FEAT-024）。</para>
+    /// </remarks>
+    /// <response code="200">一括登録結果（受信件数・保存件数・スキップ件数）</response>
+    /// <response code="400">items が空または200件超、必須項目不足</response>
+    /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した oshiId が存在しない</response>
+    [HttpPost("programs/batch")]
+    [ProducesResponseType(typeof(BatchResultResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> BatchCreatePrograms([FromBody] BatchCreateProgramsRequestDto dto)
+    {
+        if (dto.Items == null || dto.Items.Count == 0)
+            return BadRequest(new MessageResponseDto { Message = "items は1件以上必要です。" });
+        if (dto.Items.Count > 200)
+            return BadRequest(new MessageResponseDto { Message = "items は200件以下で送信してください。" });
+
+        try
+        {
+            var result = await _collectorService.BatchCreateProgramAppearancesAsync(dto);
+            return Ok(result);
+        }
+        catch (OshiNotFoundException)
+        {
+            return NotFound(new MessageResponseDto { Message = "指定した oshiId が見つかりません。" });
+        }
     }
 
     /// <summary>collector バッチの実行ログを記録する</summary>

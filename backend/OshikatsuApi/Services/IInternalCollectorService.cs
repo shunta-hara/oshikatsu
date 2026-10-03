@@ -16,4 +16,18 @@ public interface IInternalCollectorService
 
     /// <summary>全ユーザーの推し一覧を返す（collector が収集対象を把握するために使用）</summary>
     Task<IReadOnlyList<InternalOshiDto>> GetAllOshisAsync();
+
+    /// <summary>
+    /// ニュースアイテムを一括登録する。
+    /// 重複する sourceUrl（DB既存・リクエスト内）はスキップする。
+    /// 存在しない oshiId は <see cref="OshikatsuApi.Exceptions.OshiNotFoundException"/> をスロー。
+    /// </summary>
+    Task<BatchResultResponseDto> BatchCreateNewsItemsAsync(BatchCreateNewsRequestDto dto);
+
+    /// <summary>
+    /// 出演番組アイテムを一括登録する。
+    /// 重複する sourceUrl（DB既存・リクエスト内・同推しのニュースに既存）はスキップする。
+    /// 存在しない oshiId は <see cref="OshikatsuApi.Exceptions.OshiNotFoundException"/> をスロー。
+    /// </summary>
+    Task<BatchResultResponseDto> BatchCreateProgramAppearancesAsync(BatchCreateProgramsRequestDto dto);
 }

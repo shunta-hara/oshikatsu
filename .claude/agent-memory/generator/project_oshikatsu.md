@@ -7,13 +7,13 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-18 実装完了（Sprint 18: 2026-10-03）。
+Sprint 1-22 実装完了（Sprint 22: 2026-10-03）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
 ## 実装済み内容
 
-### backend/（Sprint 1-6, 10-15）
+### backend/（Sprint 1-6, 10-16, 20, 22）
 - `backend/OshikatsuApi.sln` — ソリューションファイル
 - `backend/OshikatsuApi/` — ASP.NET Core 10 Web API プロジェクト
   - EF Core + Npgsql で PostgreSQL 接続
@@ -28,7 +28,9 @@ Sprint 1-18 実装完了（Sprint 18: 2026-10-03）。
   - 収集ジョブ: `GET /api/v1/collector/status`, `POST /api/v1/internal/jobs`
   - **ブックマークAPI**: `POST /api/v1/news/{id}/bookmark`（登録）, `DELETE /api/v1/news/{id}/bookmark`（解除）, `GET /api/v1/bookmarks`（一覧）
   - **CORS 設定済み**: `http://localhost:5173` を許可（FrontendCorsPolicy）
-- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（255テスト合格）
+  - **一括登録API（Sprint 22/FEAT-023）**: `POST /api/v1/internal/news/batch`, `POST /api/v1/internal/programs/batch`（APIキー認証）
+  - **FEAT-024 番組重複排除**: 番組一括・単件保存時にニュースの既存 sourceUrl をスキップ。FeedService・DashboardService で番組一覧からニュースと重複する番組を除外
+- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（325テスト合格）
 
 ### frontend/（Sprint 7-15）
 - `frontend/` — Vite + React + TypeScript プロジェクト
