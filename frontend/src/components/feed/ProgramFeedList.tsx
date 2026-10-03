@@ -22,9 +22,9 @@ export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** 適用済み開始日時（ISO 8601 UTC 文字列 or undefined） */
+  /** 適用済み開始日時（ISO 8601 JST 文字列 or undefined） */
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
-  /** 適用済み終了日時（ISO 8601 UTC 文字列 or undefined） */
+  /** 適用済み終了日時（ISO 8601 JST 文字列 or undefined） */
   const [dateTo, setDateTo] = useState<string | undefined>(undefined);
 
   useEffect(() => {

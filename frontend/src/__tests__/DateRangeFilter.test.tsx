@@ -52,7 +52,7 @@ describe("DateRangeFilter", () => {
       string | undefined,
       string | undefined,
     ];
-    expect(from).toBe("2026-08-01T00:00:00.000Z");
+    expect(from).toBe("2026-08-01T00:00:00+09:00");
     expect(to).toBeUndefined();
   });
 
@@ -72,7 +72,7 @@ describe("DateRangeFilter", () => {
       string | undefined,
     ];
     expect(from).toBeUndefined();
-    expect(to).toBe("2026-08-31T23:59:59.999Z");
+    expect(to).toBe("2026-08-31T23:59:59.999+09:00");
   });
 
   it("開始日と終了日の両方を入力して適用するとfromとtoが渡される", async () => {
@@ -93,8 +93,8 @@ describe("DateRangeFilter", () => {
       string | undefined,
       string | undefined,
     ];
-    expect(from).toBe("2026-08-01T00:00:00.000Z");
-    expect(to).toBe("2026-08-31T23:59:59.999Z");
+    expect(from).toBe("2026-08-01T00:00:00+09:00");
+    expect(to).toBe("2026-08-31T23:59:59.999+09:00");
   });
 
   // ── 異常系 ────────────────────────────────────────────────────────────

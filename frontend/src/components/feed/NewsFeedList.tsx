@@ -23,9 +23,9 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
   const [error, setError] = useState<string | null>(null);
   /** コミット済み検索キーワード（「検索」ボタンを押したときに確定） */
   const [searchQuery, setSearchQuery] = useState("");
-  /** 適用済み開始日時（ISO 8601 UTC 文字列 or undefined） */
+  /** 適用済み開始日時（ISO 8601 JST 文字列 or undefined） */
   const [dateFrom, setDateFrom] = useState<string | undefined>(undefined);
-  /** 適用済み終了日時（ISO 8601 UTC 文字列 or undefined） */
+  /** 適用済み終了日時（ISO 8601 JST 文字列 or undefined） */
   const [dateTo, setDateTo] = useState<string | undefined>(undefined);
 
   useEffect(() => {

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 interface DateRangeFilterProps {
   /** 適用ボタン押下またはクリア時に呼ばれる。
-   *  from / to は ISO 8601 UTC 文字列（例: "2026-08-01T00:00:00.000Z"）、
+   *  from / to は ISO 8601 JST 文字列（例: "2026-08-01T00:00:00+09:00"）、
    *  未指定の場合は undefined。
    */
   onApply: (from: string | undefined, to: string | undefined) => void;
@@ -28,15 +28,13 @@ export function DateRangeFilter({ onApply }: DateRangeFilterProps) {
 
     setError(null);
 
-    // YYYY-MM-DD を ISO 8601 UTC 文字列へ変換する
-    //   from: 当日の開始（00:00:00 UTC）
-    //   to:   当日の終了（23:59:59.999 UTC）
-    const fromIso = fromDate
-      ? new Date(fromDate + "T00:00:00Z").toISOString()
-      : undefined;
-    const toIso = toDate
-      ? new Date(toDate + "T23:59:59.999Z").toISOString()
-      : undefined;
+    // YYYY-MM-DD を ISO 8601 JST 文字列へ変換する。
+    // new Date() は実行環境のタイムゾーンに依存するため使わず、
+    // +09:00 オフセットを直接付与した文字列を構築する。
+    //   from: 当日の JST 開始（00:00:00+09:00）
+    //   to:   当日の JST 終了（23:59:59.999+09:00）
+    const fromIso = fromDate ? `${fromDate}T00:00:00+09:00` : undefined;
+    const toIso = toDate ? `${toDate}T23:59:59.999+09:00` : undefined;
 
     onApply(fromIso, toIso);
   };
