@@ -33,12 +33,12 @@ export function CollectorStatus() {
   }, []);
 
   if (isLoading) {
-    return <p>読み込み中...</p>;
+    return <p className="loading-text">読み込み中...</p>;
   }
 
   if (error) {
     return (
-      <div role="alert" aria-live="assertive">
+      <div role="alert" aria-live="assertive" className="error-message">
         {error}
       </div>
     );
@@ -49,10 +49,10 @@ export function CollectorStatus() {
   }
 
   return (
-    <dl aria-label="収集ジョブ実行状況">
-      <div>
-        <dt>ニュース収集 最終実行</dt>
-        <dd>
+    <dl className="collector-status-dl" aria-label="収集ジョブ実行状況">
+      <div className="collector-status-row">
+        <dt className="collector-status-dt">ニュース収集 最終実行</dt>
+        <dd className="collector-status-dd">
           {status.latestNewsJob ? (
             <span>
               {new Date(status.latestNewsJob.executedAt).toLocaleString(
@@ -67,9 +67,9 @@ export function CollectorStatus() {
           )}
         </dd>
       </div>
-      <div>
-        <dt>番組収集 最終実行</dt>
-        <dd>
+      <div className="collector-status-row">
+        <dt className="collector-status-dt">番組収集 最終実行</dt>
+        <dd className="collector-status-dd">
           {status.latestProgramJob ? (
             <span>
               {new Date(status.latestProgramJob.executedAt).toLocaleString(

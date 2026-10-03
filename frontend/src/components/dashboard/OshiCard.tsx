@@ -12,15 +12,27 @@ interface OshiCardProps {
  */
 export function OshiCard({ card }: OshiCardProps) {
   return (
-    <article aria-label={`${card.oshiName}のダッシュボードカード`}>
-      <Link to={`/?oshiId=${card.oshiId}`}>
-        <h3>{card.oshiName}</h3>
+    <article
+      className="card oshi-card"
+      aria-label={`${card.oshiName}のダッシュボードカード`}
+    >
+      <Link to={`/?oshiId=${card.oshiId}`} className="oshi-card__name-link">
+        {card.oshiName}
       </Link>
 
-      <section aria-labelledby={`news-heading-${card.oshiId}`}>
-        <h4 id={`news-heading-${card.oshiId}`}>最新ニュース</h4>
+      <section
+        className="oshi-card__section"
+        aria-labelledby={`news-heading-${card.oshiId}`}
+      >
+        <h4
+          id={`news-heading-${card.oshiId}`}
+          className="oshi-card__section-title"
+        >
+          最新ニュース
+        </h4>
         {card.latestNews !== null ? (
           <a
+            className="oshi-card__content-link"
             href={card.latestNews.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -28,14 +40,23 @@ export function OshiCard({ card }: OshiCardProps) {
             {card.latestNews.title}
           </a>
         ) : (
-          <p>ニュースなし</p>
+          <p className="oshi-card__none">ニュースなし</p>
         )}
       </section>
 
-      <section aria-labelledby={`program-heading-${card.oshiId}`}>
-        <h4 id={`program-heading-${card.oshiId}`}>最新番組</h4>
+      <section
+        className="oshi-card__section"
+        aria-labelledby={`program-heading-${card.oshiId}`}
+      >
+        <h4
+          id={`program-heading-${card.oshiId}`}
+          className="oshi-card__section-title"
+        >
+          最新出演情報
+        </h4>
         {card.latestProgram !== null ? (
           <a
+            className="oshi-card__content-link"
             href={card.latestProgram.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
@@ -43,7 +64,7 @@ export function OshiCard({ card }: OshiCardProps) {
             {card.latestProgram.programName}
           </a>
         ) : (
-          <p>番組情報なし</p>
+          <p className="oshi-card__none">出演情報なし</p>
         )}
       </section>
     </article>

@@ -11,7 +11,7 @@ interface NewsSearchBoxProps {
 
 /**
  * ニュースのキーワード検索ボックス。
- * テキストを入力して「検索」を押すと onSearch が呼ばれる。
+ * 入力欄と「検索」ボタンを横並びで表示する。
  * コミット済みキーワード（value）が設定されているときは「クリア」ボタンが表示される。
  */
 export function NewsSearchBox({
@@ -35,8 +35,16 @@ export function NewsSearchBox({
   };
 
   return (
-    <form onSubmit={handleSubmit} role="search" aria-label="ニュース検索">
-      <label htmlFor="news-search-input">キーワード検索</label>
+    <form
+      onSubmit={handleSubmit}
+      role="search"
+      aria-label="ニュース検索"
+      className="search-row"
+    >
+      {/* label は sr-only で視覚的非表示。htmlFor 関連付けはスクリーンリーダー用に維持 */}
+      <label htmlFor="news-search-input" className="sr-only">
+        キーワード検索
+      </label>
       <input
         id="news-search-input"
         type="search"

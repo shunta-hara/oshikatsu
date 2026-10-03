@@ -14,7 +14,7 @@ interface NewsFeedListProps {
 
 /**
  * ログインユーザーの推し全員分（または特定の推し）のニュース一覧を表示するコンポーネント。
- * ページネーション・エラー・空状態・キーワード検索・日付範囲フィルタを処理する。
+ * 各アイテムをカード形式で表示し、タイトル・推し名・出典・掲載日・ブックマークを一目で確認できる。
  */
 export function NewsFeedList({ oshiId }: NewsFeedListProps) {
   const [data, setData] = useState<NewsPaginatedResponse | null>(null);
@@ -77,6 +77,18 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
 
   const isFiltered = !!searchQuery || !!dateFrom || !!dateTo;
 
+  /** 掲載日として表示する日時を選ぶ（publishedAt > collectedAt） */
+  const displayDate = (item: NewsItem): string => {
+    const dt = item.publishedAt ?? item.collectedAt;
+    return new Date(dt).toLocaleString("ja-JP", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div>
       <NewsSearchBox
@@ -86,16 +98,16 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
       />
       <DateRangeFilter onApply={handleDateApply} />
 
-      {isLoading && <p>読み込み中...</p>}
+      {isLoading && <p className="loading-text">読み込み中...</p>}
 
       {!isLoading && error && (
-        <div role="alert" aria-live="assertive">
+        <div role="alert" aria-live="assertive" className="error-message">
           {error}
         </div>
       )}
 
       {!isLoading && !error && data && data.items.length === 0 && (
-        <p>
+        <p className="empty-state">
           {isFiltered
             ? "該当するニュースが見つかりません"
             : "まだニュース情報がありません"}
@@ -104,31 +116,38 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
 
       {!isLoading && !error && data && data.items.length > 0 && (
         <>
-          <ul aria-label="ニュース一覧">
+          <ul aria-label="ニュース一覧" className="feed-list">
             {data.items.map((item: NewsItem) => (
               <li key={item.id}>
-                <article>
-                  <h3>
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                <article className="feed-card">
+                  <a
+                    className="feed-card__title"
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.title}
+                  </a>
+                  <div className="feed-card__meta">
+                    <span className="feed-card__oshi-badge">
+                      {item.oshiName}
+                    </span>
+                    <time
+                      dateTime={item.publishedAt ?? item.collectedAt}
+                      title={item.sourceUrl}
                     >
-                      {item.title}
-                    </a>
-                  </h3>
-                  <p>
-                    <span>{item.oshiName}</span>
-                    {" · "}
-                    <time dateTime={item.collectedAt}>
-                      {new Date(item.collectedAt).toLocaleString("ja-JP")}
+                      掲載日: {displayDate(item)}
                     </time>
-                  </p>
-                  {item.summary && <p>{item.summary}</p>}
-                  <BookmarkButton
-                    newsItemId={item.id}
-                    initialIsBookmarked={item.isBookmarked ?? false}
-                  />
+                  </div>
+                  {item.summary && (
+                    <p className="feed-card__summary">{item.summary}</p>
+                  )}
+                  <div className="feed-card__actions">
+                    <BookmarkButton
+                      newsItemId={item.id}
+                      initialIsBookmarked={item.isBookmarked ?? false}
+                    />
+                  </div>
                 </article>
               </li>
             ))}

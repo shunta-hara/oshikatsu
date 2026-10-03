@@ -49,10 +49,10 @@ export function OshiList({ oshis, onOshiDeleted }: OshiListProps) {
   };
 
   return (
-    <ul aria-label="推し一覧">
+    <ul aria-label="推し一覧" className="oshi-chip-list">
       {oshis.map((oshi) => (
-        <li key={oshi.id}>
-          <span>{oshi.name}</span>
+        <li key={oshi.id} className="oshi-chip">
+          <span className="oshi-chip__name">{oshi.name}</span>
           {deleteErrors[oshi.id] && (
             <span role="alert" className="field-error">
               {deleteErrors[oshi.id]}

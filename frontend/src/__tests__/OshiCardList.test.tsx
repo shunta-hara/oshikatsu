@@ -84,8 +84,8 @@ describe("OshiCardList", () => {
     expect(screen.getByText("ニュースなし")).toBeInTheDocument();
   });
 
-  it("latestProgram が null のカードは「番組情報なし」を表示する", () => {
+  it("latestProgram が null のカードは「出演情報なし」を表示する", () => {
     renderList([card1]);
-    expect(screen.getByText("番組情報なし")).toBeInTheDocument();
+    expect(screen.getByText("出演情報なし")).toBeInTheDocument();
   });
 });

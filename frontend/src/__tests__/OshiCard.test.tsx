@@ -127,9 +127,9 @@ describe("OshiCard", () => {
   });
 
   // --- 境界値：番組なし ---
-  it("latestProgram が null のとき「番組情報なし」が表示される", () => {
+  it("latestProgram が null のとき「出演情報なし」が表示される", () => {
     renderCard(cardNoProgram);
-    expect(screen.getByText("番組情報なし")).toBeInTheDocument();
+    expect(screen.getByText("出演情報なし")).toBeInTheDocument();
   });
 
   it("latestProgram が null のとき番組リンクは表示されない", () => {
@@ -140,10 +140,10 @@ describe("OshiCard", () => {
   });
 
   // --- 境界値：ニュースも番組もなし ---
-  it("ニュースも番組もないとき両方の「なし」メッセージが表示される", () => {
+  it("ニュースも出演情報もないとき両方の「なし」メッセージが表示される", () => {
     renderCard(cardEmpty);
     expect(screen.getByText("ニュースなし")).toBeInTheDocument();
-    expect(screen.getByText("番組情報なし")).toBeInTheDocument();
+    expect(screen.getByText("出演情報なし")).toBeInTheDocument();
   });
 
   // --- 異常系：他の推しIDのリンクと混同しない ---

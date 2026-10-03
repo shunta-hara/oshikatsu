@@ -5,6 +5,14 @@ metadata:
   type: project
 ---
 
+Sprint 27 評価：合格（2回目）。219/219 全テスト通過・ビルド正常。OshiCard.tsx の FEAT-024 表記変更漏れ修正確認済み。
+
+**Why:** Sprint 27 は FEAT-028 Sprint B（ダッシュボード・ブックマーク一覧のカード型レイアウト）。1回目は OshiCard.tsx「最新番組」「番組情報なし」が未修正で不合格。2回目で4箇所すべて「出演情報」に修正・テスト期待値も追随更新済み。
+
+**How to apply:** Sprint 27 合格。次は Sprint 28 へ。
+
+---
+
 Sprint 26 評価：合格（1回目）。219/219 全テスト通過。FEAT-028 Sprint A 全完了条件確認済み。
 
 **Why:** Sprint 26 は FEAT-028 Sprint A（デザイントークン・共通コンポーネント・NavBar・認証画面カード化）。App.css 削除、Vite テンプレート名残除去、ローズ系デザイントークン一元管理、コントラスト比 4.5:1 以上確認済み。

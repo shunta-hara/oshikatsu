@@ -18,7 +18,8 @@ import type { OshiDashboardCard } from "../types/dashboard";
 
 /**
  * ダッシュボードページ（認証済みユーザー専用）。
- * 推し管理セクション・マルチ推しダッシュボード・フィードフィルタUI・収集ジョブ状況を含む。
+ * 960px 以上ではサイドバー（推し管理・収集ジョブ）とメイン（フィード）の2カラムレイアウト。
+ * 375px ではシングルカラムに折り返す。
  */
 export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -126,73 +127,119 @@ export function DashboardPage() {
     <>
       <NavBar />
       <main className="page-content">
-        <h1>
+        <h1 className="dashboard-heading">
           oshikatsu ダッシュボード
           <NotificationBadge count={unreadCount} />
         </h1>
 
-        <section aria-labelledby="oshi-section-title">
-          <h2 id="oshi-section-title">推し管理</h2>
-          <OshiForm onOshiAdded={handleOshiAdded} />
+        <div className="dashboard-layout">
+          {/* ── サイドバー：推し管理 & 収集ジョブ ── */}
+          <aside>
+            <section
+              className="section-card"
+              aria-labelledby="oshi-section-title"
+            >
+              <h2 id="oshi-section-title" className="section-card__title">
+                推し管理
+              </h2>
+              <OshiForm onOshiAdded={handleOshiAdded} />
 
-          {fetchOshisError && (
-            <div role="alert" aria-live="assertive">
-              {fetchOshisError}
-            </div>
-          )}
+              {fetchOshisError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="error-message"
+                >
+                  {fetchOshisError}
+                </div>
+              )}
 
-          {isFetchingOshis ? (
-            <p>読み込み中...</p>
-          ) : (
-            <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
-          )}
-        </section>
+              {isFetchingOshis ? (
+                <p className="loading-text">読み込み中...</p>
+              ) : (
+                <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
+              )}
+            </section>
 
-        <section aria-labelledby="multi-oshi-dashboard-title">
-          <h2 id="multi-oshi-dashboard-title">マルチ推しダッシュボード</h2>
+            <section
+              className="section-card"
+              aria-labelledby="collector-section-title"
+            >
+              <h2 id="collector-section-title" className="section-card__title">
+                収集ジョブ状況
+              </h2>
+              <CollectorStatus />
+            </section>
+          </aside>
 
-          {fetchDashboardError && (
-            <div role="alert" aria-live="assertive">
-              {fetchDashboardError}
-            </div>
-          )}
+          {/* ── メイン：マルチ推しダッシュボード & フィード ── */}
+          <div>
+            <section
+              className="section-card"
+              aria-labelledby="multi-oshi-dashboard-title"
+            >
+              <h2
+                id="multi-oshi-dashboard-title"
+                className="section-card__title"
+              >
+                マルチ推しダッシュボード
+              </h2>
 
-          {isFetchingDashboard ? (
-            <p>読み込み中...</p>
-          ) : (
-            <OshiCardList cards={dashboardCards} />
-          )}
-        </section>
+              {fetchDashboardError && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="error-message"
+                >
+                  {fetchDashboardError}
+                </div>
+              )}
 
-        <section aria-labelledby="feed-section-title">
-          <h2 id="feed-section-title">フィード</h2>
-          <OshiFilter
-            oshis={oshis}
-            selectedOshiId={selectedOshiId}
-            onChange={handleOshiFilterChange}
-          />
+              {isFetchingDashboard ? (
+                <p className="loading-text">読み込み中...</p>
+              ) : (
+                <OshiCardList cards={dashboardCards} />
+              )}
+            </section>
 
-          <section aria-labelledby="news-section-title">
-            <h3 id="news-section-title">ニュース</h3>
-            <NewsFeedList
-              key={String(selectedOshiId)}
-              oshiId={selectedOshiId ?? undefined}
-            />
-          </section>
+            <section
+              className="section-card"
+              aria-labelledby="feed-section-title"
+            >
+              <h2 id="feed-section-title" className="section-card__title">
+                フィード
+              </h2>
+              <OshiFilter
+                oshis={oshis}
+                selectedOshiId={selectedOshiId}
+                onChange={handleOshiFilterChange}
+              />
 
-          <section aria-labelledby="programs-section-title">
-            <h3 id="programs-section-title">出演情報</h3>
-            <ProgramFeedList
-              key={String(selectedOshiId)}
-              oshiId={selectedOshiId ?? undefined}
-            />
-          </section>
-        </section>
+              <section aria-labelledby="news-section-title">
+                <h3 id="news-section-title" className="section-card__subtitle">
+                  ニュース
+                </h3>
+                <NewsFeedList
+                  key={String(selectedOshiId)}
+                  oshiId={selectedOshiId ?? undefined}
+                />
+              </section>
 
-        <section aria-labelledby="collector-section-title">
-          <h2 id="collector-section-title">収集ジョブ状況</h2>
-          <CollectorStatus />
-        </section>
+              <section aria-labelledby="programs-section-title">
+                <h3
+                  id="programs-section-title"
+                  className="section-card__subtitle"
+                >
+                  出演情報
+                </h3>
+                <ProgramFeedList
+                  key={String(selectedOshiId)}
+                  oshiId={selectedOshiId ?? undefined}
+                />
+              </section>
+            </section>
+          </div>
+        </div>
       </main>
     </>
   );

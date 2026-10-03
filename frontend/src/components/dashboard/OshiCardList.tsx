@@ -6,16 +6,20 @@ interface OshiCardListProps {
 }
 
 /**
- * 推し全員のダッシュボードカードをリスト表示するコンポーネント。
+ * 推し全員のダッシュボードカードをグリッド表示するコンポーネント。
  * 推しが登録されていない場合は案内メッセージを表示する。
  */
 export function OshiCardList({ cards }: OshiCardListProps) {
   if (cards.length === 0) {
-    return <p>推しを登録するとダッシュボードカードが表示されます。</p>;
+    return (
+      <p className="empty-state">
+        推しを登録するとダッシュボードカードが表示されます。
+      </p>
+    );
   }
 
   return (
-    <ul>
+    <ul className="oshi-card-grid">
       {cards.map((card) => (
         <li key={card.oshiId}>
           <OshiCard card={card} />

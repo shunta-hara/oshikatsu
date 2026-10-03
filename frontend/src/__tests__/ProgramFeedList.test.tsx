@@ -192,7 +192,7 @@ describe("ProgramFeedList", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("番組情報の取得に失敗しました"),
+        screen.getByText("出演情報の取得に失敗しました"),
       ).toBeInTheDocument();
     });
   });
@@ -283,7 +283,7 @@ describe("ProgramFeedList", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("該当する番組が見つかりません"),
+        screen.getByText("該当する出演情報が見つかりません"),
       ).toBeInTheDocument();
     });
   });

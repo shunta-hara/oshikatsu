@@ -10,9 +10,8 @@ interface DateRangeFilterProps {
 
 /**
  * 日付範囲フィルタコンポーネント。
- * 開始日・終了日を入力して「期間を適用」を押すと onApply が呼ばれる。
+ * 開始日・終了日・「期間を適用」・「クリア」を横並びで表示する（狭い画面では折り返す）。
  * 終了日が開始日より前の場合はバリデーションエラーを表示し、onApply は呼ばれない。
- * 「クリア」を押すと onApply(undefined, undefined) が呼ばれる。
  */
 export function DateRangeFilter({ onApply }: DateRangeFilterProps) {
   const [fromDate, setFromDate] = useState("");
@@ -47,29 +46,33 @@ export function DateRangeFilter({ onApply }: DateRangeFilterProps) {
   };
 
   return (
-    <div>
-      <label htmlFor="date-filter-from">開始日</label>
-      <input
-        id="date-filter-from"
-        type="date"
-        value={fromDate}
-        onChange={(e) => setFromDate(e.target.value)}
-      />
-      <label htmlFor="date-filter-to">終了日</label>
-      <input
-        id="date-filter-to"
-        type="date"
-        value={toDate}
-        onChange={(e) => setToDate(e.target.value)}
-      />
-      <button type="button" onClick={handleApply}>
+    <div className="date-filter-row">
+      <div className="date-filter-field">
+        <label htmlFor="date-filter-from">開始日</label>
+        <input
+          id="date-filter-from"
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+        />
+      </div>
+      <div className="date-filter-field">
+        <label htmlFor="date-filter-to">終了日</label>
+        <input
+          id="date-filter-to"
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+        />
+      </div>
+      <button type="button" className="btn-secondary" onClick={handleApply}>
         期間を適用
       </button>
-      <button type="button" onClick={handleClear}>
+      <button type="button" className="btn-secondary" onClick={handleClear}>
         クリア
       </button>
       {error && (
-        <div role="alert" aria-live="polite">
+        <div role="alert" aria-live="polite" className="field-error">
           {error}
         </div>
       )}

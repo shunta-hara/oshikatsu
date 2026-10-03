@@ -15,7 +15,7 @@ interface ProgramFeedListProps {
 
 /**
  * ログインユーザーの推し全員分（または特定の推し）の出演情報一覧を表示するコンポーネント。
- * ページネーション・エラー・空状態・日付範囲フィルタを処理する。
+ * 各アイテムをカード形式で表示し、タイトル・推し名・出典・掲載日を一目で確認できる。
  */
 export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
   const [data, setData] = useState<ProgramsPaginatedResponse | null>(null);
@@ -38,7 +38,7 @@ export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
         if (err instanceof ApiError) {
           setError(err.message);
         } else {
-          setError("番組情報の取得に失敗しました");
+          setError("出演情報の取得に失敗しました");
         }
       } finally {
         setIsLoading(false);
@@ -59,49 +59,66 @@ export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
 
   const isFiltered = !!dateFrom || !!dateTo;
 
+  /** 掲載日として表示する日時を選ぶ（airedAt > collectedAt） */
+  const displayDate = (item: ProgramAppearance): string => {
+    const dt = item.airedAt ?? item.collectedAt;
+    return new Date(dt).toLocaleString("ja-JP", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   return (
     <div>
       <DateRangeFilter onApply={handleDateApply} />
 
-      {isLoading && <p>読み込み中...</p>}
+      {isLoading && <p className="loading-text">読み込み中...</p>}
 
       {!isLoading && error && (
-        <div role="alert" aria-live="assertive">
+        <div role="alert" aria-live="assertive" className="error-message">
           {error}
         </div>
       )}
 
       {!isLoading && !error && data && data.items.length === 0 && (
-        <p>
+        <p className="empty-state">
           {isFiltered
-            ? "該当する番組が見つかりません"
+            ? "該当する出演情報が見つかりません"
             : "まだ出演情報がありません"}
         </p>
       )}
 
       {!isLoading && !error && data && data.items.length > 0 && (
         <div>
-          <ul aria-label="出演情報一覧">
+          <ul aria-label="出演情報一覧" className="feed-list">
             {data.items.map((item: ProgramAppearance) => (
               <li key={item.id}>
-                <article>
-                  <h3>
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                <article className="feed-card">
+                  <a
+                    className="feed-card__title"
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.programName}
+                  </a>
+                  <div className="feed-card__meta">
+                    <span className="feed-card__oshi-badge">
+                      {item.oshiName}
+                    </span>
+                    {item.broadcaster != null && (
+                      <span>{item.broadcaster}</span>
+                    )}
+                    <time
+                      dateTime={item.airedAt ?? item.collectedAt}
+                      title={item.sourceUrl}
                     >
-                      {item.programName}
-                    </a>
-                  </h3>
-                  <p>
-                    <span>{item.oshiName}</span>
-                    {item.broadcaster != null && ` · ${item.broadcaster}`}
-                    {" · "}
-                    <time dateTime={item.collectedAt}>
-                      {new Date(item.collectedAt).toLocaleString("ja-JP")}
+                      掲載日: {displayDate(item)}
                     </time>
-                  </p>
+                  </div>
                 </article>
               </li>
             ))}
