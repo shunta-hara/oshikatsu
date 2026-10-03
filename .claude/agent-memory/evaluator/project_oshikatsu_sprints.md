@@ -5,6 +5,26 @@ metadata:
   type: project
 ---
 
+Sprint 25 評価：合格（2回目）。360/360 テスト通過。FEAT-027 全項目確認済み。
+
+**Why:** Sprint 25 は FEAT-027（trailing slash/case-insensitive/Swagger Production 非公開）。1回目は FeedServiceTests.cs 既存39件削除で不合格。2回目で HEAD 復元+5件追加(360件)で合格。
+
+**How to apply:** Sprint 25 合格。次は Sprint 26（Webデザイン刷新 Sprint A）。
+
+## Sprint 25 評価 (2026-10-03): 不合格（1回目）
+
+- 対象: FEAT-027（細かな不具合・設定の修正）
+- 結果: **不合格**
+- ビルド: 0エラー
+- テスト: 316/316 PASS（既存 39 件削除が問題）
+- 🔴 必須違反: FeedServiceTests.cs から 39 メソッド削除（HEAD: 55件 → 作業ツリー: 16件）
+- 🟡 推奨違反 2件: (1) DB プロバイダ分岐を本番コードに入れる設計 (2) EscapeILikePattern が PostgreSQL で機能しない（Npgsql が ESCAPE '' を生成）
+
+### 動的確認（完了分）
+- Development Swagger: 200 ✅
+- 大文字小文字区別なし（NHK/nhk）: 同じ結果 ✅
+- VITE_API_BASE_URL 末尾スラッシュ除去: コード・テスト確認 ✅
+
 Sprint 24 評価完了（合格、1回目）。FEAT-026（推し登録直後即時収集）・FEAT-024（frontend表記変更）両方合格。backend 342/342・frontend 217/217 全テスト通過。
 
 **Why:** Sprint 24はFEAT-026+FEAT-024(frontend)。GitHubDispatchService singleton + fire-and-forget 設計確認済み。

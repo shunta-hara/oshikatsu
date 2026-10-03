@@ -193,12 +193,19 @@ forwardedOptions.KnownIPNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
 
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+// Swagger: Development では常に公開、Production では ENABLE_SWAGGER=true のときのみ公開。
+// Render 上（ASPNETCORE_ENVIRONMENT=Production）では ENABLE_SWAGGER 未設定のとき非公開になる。
+if (SwaggerHelper.IsEnabled(
+        app.Environment.EnvironmentName,
+        Environment.GetEnvironmentVariable("ENABLE_SWAGGER")))
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Oshikatsu API v1");
-    options.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Oshikatsu API v1");
+        options.RoutePrefix = "swagger";
+    });
+}
 
 app.UseCors(FrontendCorsPolicy);
 app.UseAuthentication();

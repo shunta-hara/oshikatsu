@@ -927,4 +927,77 @@ public class FeedServiceTests : IDisposable
         await _db.SaveChangesAsync();
         return item;
     }
+
+    // ── キーワード検索: 大文字小文字を区別しない（Sprint 25 FEAT-027）──────────
+
+    [Fact]
+    public async Task GetNewsAsync_KeywordSearch_LowercaseQueryMatchesUppercaseTitle()
+    {
+        // "NHK Morning Show" を小文字クエリ "nhk" で検索できる
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "NHK Morning Show");
+        await CreateNewsItem(oshi, "Fuji TV Evening News");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "nhk");
+
+        Assert.Single(result.Items);
+        Assert.Contains("NHK", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_KeywordSearch_UppercaseQueryMatchesLowercaseTitle()
+    {
+        // "nhk morning" タイトルを大文字クエリ "NHK" で検索できる
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "nhk morning digest");
+        await CreateNewsItem(oshi, "fuji tv report");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "NHK");
+
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_KeywordSearch_MixedCaseQueryMatchesMixedCaseTitle()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "NHK朝のニュース");
+
+        // 大文字・小文字・混在の3パターンすべてが同じ1件を返す
+        var lower = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "nhk");
+        var upper = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "NHK");
+        var mixed = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "Nhk");
+
+        Assert.Equal(1, lower.TotalCount);
+        Assert.Equal(1, upper.TotalCount);
+        Assert.Equal(1, mixed.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_KeywordSearch_PercentInQueryTreatedAsLiteral()
+    {
+        // "%" はワイルドカードではなくリテラルとして扱われる
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "100%成功");      // 一致するはず
+        await CreateNewsItem(oshi, "普通の記事タイトル");    // 一致しないはず
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "100%");
+
+        Assert.Single(result.Items);
+        Assert.Contains("100%", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_KeywordSearch_UnderscoreInQueryTreatedAsLiteral()
+    {
+        // "_" はワイルドカードではなくリテラルとして扱われる
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "nhk_morning_news");  // 一致するはず
+        await CreateNewsItem(oshi, "nhk morning news");  // 一致しないはず（_ はリテラル）
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "nhk_morning");
+
+        Assert.Single(result.Items);
+        Assert.Contains("nhk_morning_news", result.Items[0].Title);
+    }
 }

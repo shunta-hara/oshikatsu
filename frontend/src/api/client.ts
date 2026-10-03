@@ -19,7 +19,10 @@ export class ApiError extends Error {
  */
 export function getApiBase(): string {
   const baseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
-  return baseUrl ? `${baseUrl}/api/v1` : "/api/v1";
+  if (!baseUrl) return "/api/v1";
+  // 末尾の連続スラッシュを取り除いてから /api/v1 を付加する。
+  // VITE_API_BASE_URL に末尾スラッシュが付いていても //api/v1/... にならないようにする。
+  return `${baseUrl.replace(/\/+$/, "")}/api/v1`;
 }
 
 /**

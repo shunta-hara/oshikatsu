@@ -44,12 +44,16 @@ public class FeedService : IFeedService
 
         var newsQuery = _db.NewsItems.Where(n => oshiIds.Contains(n.OshiId));
 
-        // キーワード検索: タイトルまたは本文要約に対して部分一致で絞り込む
+        // キーワード検索: タイトルまたは本文要約に対して大文字小文字を区別しない部分一致で絞り込む。
+        // ToLower().Contains() を使うことで、PostgreSQL（Npgsql が lower()+strpos に変換）と
+        // InMemory（C# の string.Contains() をそのまま使用）の両方で動作する。
+        // EF Core が Contains() のパターン中の % / _ / \ を自動エスケープするため手動エスケープ不要。
         if (!string.IsNullOrWhiteSpace(query))
         {
+            var lowerQuery = query.ToLowerInvariant();
             newsQuery = newsQuery.Where(n =>
-                n.Title.Contains(query) ||
-                (n.Summary != null && n.Summary.Contains(query)));
+                n.Title.ToLower().Contains(lowerQuery) ||
+                (n.Summary != null && n.Summary.ToLower().Contains(lowerQuery)));
         }
 
         // 日付範囲フィルタ: 公開日時（PublishedAt）で絞り込む。
@@ -235,4 +239,5 @@ public class FeedService : IFeedService
         user.LastViewedFeedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
     }
+
 }

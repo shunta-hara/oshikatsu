@@ -43,6 +43,16 @@ describe("getApiBase", () => {
     vi.stubEnv("VITE_API_BASE_URL", "https://render-backend.onrender.com");
     expect(getApiBase()).toBe("https://render-backend.onrender.com/api/v1");
   });
+
+  it("VITE_API_BASE_URL の末尾に / が付いていても //api/v1 にならない", () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://backend.example.com/");
+    expect(getApiBase()).toBe("https://backend.example.com/api/v1");
+  });
+
+  it("VITE_API_BASE_URL の末尾に複数の / が付いていても //api/v1 にならない", () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://backend.example.com///");
+    expect(getApiBase()).toBe("https://backend.example.com/api/v1");
+  });
 });
 
 // ------------------------------------------------------------------
