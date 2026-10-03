@@ -133,6 +133,59 @@ public class CollectorJobLogServiceTests : IDisposable
             Arg.Any<Func<object, Exception?, string>>());
     }
 
+    // ── RecordJobLogAsync: UTC 正規化（FEAT-017）────────────────────────────
+
+    [Fact]
+    public async Task RecordJobLogAsync_JstExecutedAt_NormalizesToUtc()
+    {
+        // JST (UTC+09:00) のオフセット付き日時を送ると UTC で保存される
+        var jstOffset = TimeSpan.FromHours(9);
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset); // 2026-10-05T20:00:00+09:00
+        var dto = new CreateJobLogRequestDto
+        {
+            JobType = "news",
+            ExecutedAt = jstTime,
+            SuccessCount = 1,
+            FailureCount = 0,
+        };
+
+        await _sut.RecordJobLogAsync(dto);
+
+        var saved = await _db.CollectorJobLogs.FirstOrDefaultAsync();
+        Assert.NotNull(saved);
+        Assert.Equal(TimeSpan.Zero, saved!.ExecutedAt.Offset);
+        Assert.Equal(jstTime.UtcDateTime, saved.ExecutedAt.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task RecordJobLogAsync_UtcAndJstEquivalent_StoresSameUtcInstant()
+    {
+        var utcTime = new DateTimeOffset(2026, 10, 5, 11, 0, 0, TimeSpan.Zero);
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9));
+
+        await _sut.RecordJobLogAsync(new CreateJobLogRequestDto
+        {
+            JobType = "news",
+            ExecutedAt = utcTime,
+            SuccessCount = 1,
+            FailureCount = 0,
+        });
+        await _sut.RecordJobLogAsync(new CreateJobLogRequestDto
+        {
+            JobType = "program",
+            ExecutedAt = jstTime,
+            SuccessCount = 1,
+            FailureCount = 0,
+        });
+
+        var logs = await _db.CollectorJobLogs.OrderBy(l => l.JobType).ToListAsync();
+        Assert.Equal(2, logs.Count);
+        // UTC と JST の同じ瞬間 → 同一の UTC 値で保存される
+        Assert.Equal(logs[0].ExecutedAt.UtcDateTime, logs[1].ExecutedAt.UtcDateTime);
+        Assert.Equal(TimeSpan.Zero, logs[0].ExecutedAt.Offset);
+        Assert.Equal(TimeSpan.Zero, logs[1].ExecutedAt.Offset);
+    }
+
     // ── GetStatusAsync: 正常系 ───────────────────────────────────────────────
 
     [Fact]

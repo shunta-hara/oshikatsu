@@ -21,11 +21,13 @@ public class CollectorJobLogService : ICollectorJobLogService
     /// <inheritdoc />
     public async Task<JobLogResponseDto> RecordJobLogAsync(CreateJobLogRequestDto dto)
     {
+        // Npgsql は UTC 以外のオフセット付き DateTimeOffset を timestamptz に書き込めないため
+        // 受信した DateTimeOffset を UTC に正規化してから保存する
         var now = DateTimeOffset.UtcNow;
         var log = new CollectorJobLog
         {
             JobType = dto.JobType,
-            ExecutedAt = dto.ExecutedAt,
+            ExecutedAt = dto.ExecutedAt.ToUniversalTime(),
             SuccessCount = dto.SuccessCount,
             FailureCount = dto.FailureCount,
             CreatedAt = now,

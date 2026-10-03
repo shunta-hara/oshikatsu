@@ -203,6 +203,115 @@ public class InternalCollectorServiceTests : IDisposable
         Assert.True(result.WasDuplicate);
     }
 
+    // ── CreateNewsItemAsync: UTC 正規化（FEAT-017）──────────────────────────
+
+    [Fact]
+    public async Task CreateNewsItemAsync_JstPublishedAt_NormalizesToUtc()
+    {
+        // JST (UTC+09:00) のオフセット付き公開日時を送ると UTC で保存される
+        var jstOffset = TimeSpan.FromHours(9);
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset); // 2026-10-05T20:00:00+09:00
+        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/jst-pub",
+            publishedAt: jstTime, collectedAt: _now);
+
+        await _sut.CreateNewsItemAsync(dto);
+
+        var saved = await _db.NewsItems.FirstAsync();
+        // 保存後は UTC（オフセット0）で格納される
+        Assert.Equal(TimeSpan.Zero, saved.PublishedAt!.Value.Offset);
+        // UTC 変換後も同じ瞬間を指す
+        Assert.Equal(jstTime.UtcDateTime, saved.PublishedAt.Value.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task CreateNewsItemAsync_JstCollectedAt_NormalizesToUtc()
+    {
+        // CollectedAt に JST オフセットが来ても UTC で保存される
+        var jstOffset = TimeSpan.FromHours(9);
+        var jstCollectedAt = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset);
+        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/jst-col",
+            collectedAt: jstCollectedAt);
+
+        await _sut.CreateNewsItemAsync(dto);
+
+        var saved = await _db.NewsItems.FirstAsync();
+        Assert.Equal(TimeSpan.Zero, saved.CollectedAt.Offset);
+        Assert.Equal(jstCollectedAt.UtcDateTime, saved.CollectedAt.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task CreateNewsItemAsync_UtcAndJstEquivalent_StoresSameUtcInstant()
+    {
+        // UTC と JST の同じ瞬間を表す DateTimeOffset は同一の UTC 値として保存される
+        var utcTime = new DateTimeOffset(2026, 10, 5, 11, 0, 0, TimeSpan.Zero);       // UTC
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9)); // JST (同じ瞬間)
+
+        var dtoUtc = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/utc", publishedAt: utcTime);
+        var dtoJst = BuildNewsDto(oshiId: 2, sourceUrl: "https://example.com/news/jst", publishedAt: jstTime);
+
+        await _sut.CreateNewsItemAsync(dtoUtc);
+        await _sut.CreateNewsItemAsync(dtoJst);
+
+        var items = await _db.NewsItems.OrderBy(n => n.OshiId).ToListAsync();
+        Assert.Equal(2, items.Count);
+        // 両方とも同じ UTC 瞬間で保存されている
+        Assert.Equal(items[0].PublishedAt!.Value.UtcDateTime, items[1].PublishedAt!.Value.UtcDateTime);
+        Assert.Equal(TimeSpan.Zero, items[0].PublishedAt!.Value.Offset);
+        Assert.Equal(TimeSpan.Zero, items[1].PublishedAt!.Value.Offset);
+    }
+
+    // ── CreateProgramAppearanceAsync: UTC 正規化（FEAT-017）──────────────────
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_JstAiredAt_NormalizesToUtc()
+    {
+        // JST (UTC+09:00) のオフセット付き放送日時を送ると UTC で保存される
+        var jstOffset = TimeSpan.FromHours(9);
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset); // 2026-10-05T20:00:00+09:00
+        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/jst-aired",
+            airedAt: jstTime, collectedAt: _now);
+
+        await _sut.CreateProgramAppearanceAsync(dto);
+
+        var saved = await _db.ProgramAppearances.FirstAsync();
+        Assert.Equal(TimeSpan.Zero, saved.AiredAt!.Value.Offset);
+        Assert.Equal(jstTime.UtcDateTime, saved.AiredAt.Value.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_JstCollectedAt_NormalizesToUtc()
+    {
+        var jstOffset = TimeSpan.FromHours(9);
+        var jstCollectedAt = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset);
+        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/jst-col",
+            collectedAt: jstCollectedAt);
+
+        await _sut.CreateProgramAppearanceAsync(dto);
+
+        var saved = await _db.ProgramAppearances.FirstAsync();
+        Assert.Equal(TimeSpan.Zero, saved.CollectedAt.Offset);
+        Assert.Equal(jstCollectedAt.UtcDateTime, saved.CollectedAt.UtcDateTime);
+    }
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_UtcAndJstEquivalent_StoresSameUtcInstant()
+    {
+        var utcTime = new DateTimeOffset(2026, 10, 5, 11, 0, 0, TimeSpan.Zero);
+        var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9));
+
+        var dtoUtc = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/utc", airedAt: utcTime);
+        var dtoJst = BuildProgramDto(oshiId: 2, sourceUrl: "https://tv.example.com/prog/jst", airedAt: jstTime);
+
+        await _sut.CreateProgramAppearanceAsync(dtoUtc);
+        await _sut.CreateProgramAppearanceAsync(dtoJst);
+
+        var items = await _db.ProgramAppearances.OrderBy(p => p.OshiId).ToListAsync();
+        Assert.Equal(2, items.Count);
+        Assert.Equal(items[0].AiredAt!.Value.UtcDateTime, items[1].AiredAt!.Value.UtcDateTime);
+        Assert.Equal(TimeSpan.Zero, items[0].AiredAt!.Value.Offset);
+        Assert.Equal(TimeSpan.Zero, items[1].AiredAt!.Value.Offset);
+    }
+
     // ── GetAllOshisAsync: 正常系 ─────────────────────────────────────────────
 
     [Fact]

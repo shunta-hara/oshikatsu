@@ -28,8 +28,11 @@ public class InternalCollectorService : IInternalCollectorService
         }
 
         // 公開日時が未取得の場合は収集日時で代替し、推定フラグを立てる
+        // Npgsql は UTC 以外のオフセット付き DateTimeOffset を timestamptz に書き込めないため
+        // 受信した DateTimeOffset をすべて UTC に正規化してから保存する
         var isEstimated = dto.PublishedAt is null;
-        var publishedAt = dto.PublishedAt ?? dto.CollectedAt;
+        var publishedAt = (dto.PublishedAt ?? dto.CollectedAt).ToUniversalTime();
+        var collectedAt = dto.CollectedAt.ToUniversalTime();
 
         var now = DateTimeOffset.UtcNow;
         var item = new NewsItem
@@ -40,7 +43,7 @@ public class InternalCollectorService : IInternalCollectorService
             SourceUrl = dto.SourceUrl,
             PublishedAt = publishedAt,
             IsPublishedAtEstimated = isEstimated,
-            CollectedAt = dto.CollectedAt,
+            CollectedAt = collectedAt,
             CreatedAt = now,
         };
 
@@ -63,8 +66,11 @@ public class InternalCollectorService : IInternalCollectorService
         }
 
         // 放送日時が未取得の場合は収集日時で代替し、推定フラグを立てる
+        // Npgsql は UTC 以外のオフセット付き DateTimeOffset を timestamptz に書き込めないため
+        // 受信した DateTimeOffset をすべて UTC に正規化してから保存する
         var isEstimated = dto.AiredAt is null;
-        var airedAt = dto.AiredAt ?? dto.CollectedAt;
+        var airedAt = (dto.AiredAt ?? dto.CollectedAt).ToUniversalTime();
+        var collectedAt = dto.CollectedAt.ToUniversalTime();
 
         var now = DateTimeOffset.UtcNow;
         var item = new ProgramAppearance
@@ -75,7 +81,7 @@ public class InternalCollectorService : IInternalCollectorService
             AiredAt = airedAt,
             IsAiredAtEstimated = isEstimated,
             SourceUrl = dto.SourceUrl,
-            CollectedAt = dto.CollectedAt,
+            CollectedAt = collectedAt,
             CreatedAt = now,
         };
 

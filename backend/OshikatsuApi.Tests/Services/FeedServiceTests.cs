@@ -667,6 +667,68 @@ public class FeedServiceTests : IDisposable
         Assert.Equal(2, result.TotalCount);
     }
 
+    // ── GetNewsAsync: JST フィルタ UTC 正規化（FEAT-017）────────────────────
+
+    [Fact]
+    public async Task GetNewsAsync_JstFrom_SameResultAsUtcEquivalent()
+    {
+        // UTC 2026-10-02T11:00:00Z に公開されたニュース
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var utcPublished = new DateTimeOffset(2026, 10, 2, 11, 0, 0, TimeSpan.Zero);
+        await CreateNewsItem(oshi, "対象記事", publishedAt: utcPublished);
+
+        // JST from: 2026-10-02T10:00:00+09:00 == 2026-10-02T01:00:00Z（記事より前）
+        var jstFrom = new DateTimeOffset(2026, 10, 2, 10, 0, 0, TimeSpan.FromHours(9));
+        // 等価 UTC from: 2026-10-02T01:00:00Z
+        var utcFrom = jstFrom.ToUniversalTime();
+
+        var resultJst = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: jstFrom);
+        var resultUtc = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: utcFrom);
+
+        // JST フィルタと UTC フィルタは同じ結果を返す
+        Assert.Equal(resultUtc.TotalCount, resultJst.TotalCount);
+        Assert.Equal(1, resultJst.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_JstTo_SameResultAsUtcEquivalent()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var utcPublished = new DateTimeOffset(2026, 10, 2, 11, 0, 0, TimeSpan.Zero);
+        await CreateNewsItem(oshi, "対象記事", publishedAt: utcPublished);
+
+        // JST to: 2026-10-02T21:00:00+09:00 == 2026-10-02T12:00:00Z（記事より後）
+        var jstTo = new DateTimeOffset(2026, 10, 2, 21, 0, 0, TimeSpan.FromHours(9));
+        var utcTo = jstTo.ToUniversalTime();
+
+        var resultJst = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, to: jstTo);
+        var resultUtc = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, to: utcTo);
+
+        Assert.Equal(resultUtc.TotalCount, resultJst.TotalCount);
+        Assert.Equal(1, resultJst.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_JstFrom_ExcludesItemBeforeJstBoundary()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        // 範囲外（古）: 2026-10-01T00:00:00Z
+        var oldItem = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        // 範囲内: 2026-10-02T15:00:00Z
+        var newItem = new DateTimeOffset(2026, 10, 2, 15, 0, 0, TimeSpan.Zero);
+        await CreateNewsItem(oshi, "古い記事", publishedAt: oldItem);
+        await CreateNewsItem(oshi, "新しい記事", publishedAt: newItem);
+
+        // JST from: 2026-10-02T00:00:00+09:00 == 2026-10-01T15:00:00Z
+        var jstFrom = new DateTimeOffset(2026, 10, 2, 0, 0, 0, TimeSpan.FromHours(9));
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, from: jstFrom);
+
+        // 2026-10-01T00:00:00Z は jstFrom(=2026-10-01T15:00:00Z) より前なので除外
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("新しい記事", result.Items[0].Title);
+    }
+
     // ── GetProgramsAsync: 日付範囲フィルタ ─────────────────────────────────
 
     [Fact]
@@ -729,6 +791,62 @@ public class FeedServiceTests : IDisposable
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("範囲内", result.Items[0].ProgramName);
+    }
+
+    // ── GetProgramsAsync: JST フィルタ UTC 正規化（FEAT-017）────────────────
+
+    [Fact]
+    public async Task GetProgramsAsync_JstFrom_SameResultAsUtcEquivalent()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var utcAiredAt = new DateTimeOffset(2026, 10, 2, 11, 0, 0, TimeSpan.Zero);
+        await CreateProgramAppearance(oshi, "対象番組", airedAt: utcAiredAt);
+
+        // JST from: 2026-10-02T10:00:00+09:00 == 2026-10-02T01:00:00Z（番組より前）
+        var jstFrom = new DateTimeOffset(2026, 10, 2, 10, 0, 0, TimeSpan.FromHours(9));
+        var utcFrom = jstFrom.ToUniversalTime();
+
+        var resultJst = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: jstFrom);
+        var resultUtc = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: utcFrom);
+
+        Assert.Equal(resultUtc.TotalCount, resultJst.TotalCount);
+        Assert.Equal(1, resultJst.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetProgramsAsync_JstTo_SameResultAsUtcEquivalent()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var utcAiredAt = new DateTimeOffset(2026, 10, 2, 11, 0, 0, TimeSpan.Zero);
+        await CreateProgramAppearance(oshi, "対象番組", airedAt: utcAiredAt);
+
+        // JST to: 2026-10-02T21:00:00+09:00 == 2026-10-02T12:00:00Z（番組より後）
+        var jstTo = new DateTimeOffset(2026, 10, 2, 21, 0, 0, TimeSpan.FromHours(9));
+        var utcTo = jstTo.ToUniversalTime();
+
+        var resultJst = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, to: jstTo);
+        var resultUtc = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, to: utcTo);
+
+        Assert.Equal(resultUtc.TotalCount, resultJst.TotalCount);
+        Assert.Equal(1, resultJst.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetProgramsAsync_JstFrom_ExcludesItemBeforeJstBoundary()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var oldItem = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero);
+        var newItem = new DateTimeOffset(2026, 10, 2, 15, 0, 0, TimeSpan.Zero);
+        await CreateProgramAppearance(oshi, "古い番組", airedAt: oldItem);
+        await CreateProgramAppearance(oshi, "新しい番組", airedAt: newItem);
+
+        // JST from: 2026-10-02T00:00:00+09:00 == 2026-10-01T15:00:00Z
+        var jstFrom = new DateTimeOffset(2026, 10, 2, 0, 0, 0, TimeSpan.FromHours(9));
+
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, from: jstFrom);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("新しい番組", result.Items[0].ProgramName);
     }
 
     // ── ヘルパー ─────────────────────────────────────────────────────────────

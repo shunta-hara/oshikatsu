@@ -54,13 +54,17 @@ public class FeedService : IFeedService
 
         // 日付範囲フィルタ: 公開日時（PublishedAt）で絞り込む。
         // PublishedAt が null のアイテムはフィルタ適用時に除外される。
+        // Npgsql は UTC 以外のオフセット付き DateTimeOffset をクエリパラメータとして使えないため
+        // from/to を UTC に正規化してから渡す。
         if (from.HasValue)
         {
-            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt >= from.Value);
+            var fromUtc = from.Value.ToUniversalTime();
+            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt >= fromUtc);
         }
         if (to.HasValue)
         {
-            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt <= to.Value);
+            var toUtc = to.Value.ToUniversalTime();
+            newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt <= toUtc);
         }
 
         var orderedQuery = newsQuery.OrderByDescending(n => n.CollectedAt);
@@ -138,13 +142,17 @@ public class FeedService : IFeedService
 
         // 日付範囲フィルタ: 放送日時（AiredAt）で絞り込む。
         // AiredAt が null のアイテムはフィルタ適用時に除外される。
+        // Npgsql は UTC 以外のオフセット付き DateTimeOffset をクエリパラメータとして使えないため
+        // from/to を UTC に正規化してから渡す。
         if (from.HasValue)
         {
-            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt >= from.Value);
+            var fromUtc = from.Value.ToUniversalTime();
+            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt >= fromUtc);
         }
         if (to.HasValue)
         {
-            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt <= to.Value);
+            var toUtc = to.Value.ToUniversalTime();
+            programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt <= toUtc);
         }
 
         var query = programsQuery.OrderByDescending(p => p.CollectedAt);
