@@ -5,11 +5,25 @@ metadata:
   type: project
 ---
 
-Sprint 17まで完了。FEAT-018（日付範囲フィルタJST基準化）実装済み。
+Sprint 19まで完了。FEAT-020（frontendのAPIベースURL環境変数化・SPAルーティング）実装済み。
 
-**Why:** FEAT-001〜015をカバーするために14スプリントが計画・実施された。
+**Why:** FEAT-001〜022をカバーするために21スプリントが計画・実施された。
 
 **How to apply:** 新規スプリント開始時はこのプロジェクトの現在状態を参照する。
+
+## Sprint 19 評価 (2026-10-03)
+
+- 対象: FEAT-020（frontendのAPIベースURL環境変数化・SPAルーティング）
+- 結果: 合格
+- ビルド/テスト: frontend 216/216
+- 動的テスト: Viteプロキシ経由API呼び出し・登録→ダッシュボード遷移・SPA直接アクセス（/bookmarks）・ナビゲーションバー確認 すべて正常
+- コード品質: 必須違反0件、🟡推奨違反1件（末尾スラッシュ未対応 - 上限3件以内）
+- 実装: frontend/src/api/client.ts（getApiBase 関数）、frontend/public/_redirects（`/* /index.html 200`）
+
+## Sprint 18 評価 (2026-10-03)
+
+- 対象: FEAT-019（共通スタイル・ナビゲーション統一）
+- 結果: 合格 ※Sprint 18 eval記録参照
 
 ## Sprint 17 評価 (2026-10-03)
 
@@ -78,3 +92,5 @@ FEAT-018（日付範囲フィルタJST基準化）: Sprint 17で実装済み。
 - collector requirements-dev.txt に pytest・responses が分離されている（requirements.txt は runtime のみ）
 - FeedService.GetUnreadCountAsync: LastViewedFeedAt=null（未閲覧）は 0 を返す。mark-as-read でリセット後も画面滞在中はバッジ件数を維持する設計
 - NotificationBadge: role="status" + aria-label でアクセシビリティ対応
+- getApiBase (Sprint 19): VITE_API_BASE_URL 未設定 → `/api/v1`、設定時 → `${VITE_API_BASE_URL}/api/v1`。末尾スラッシュのトリミングは未実装（仕様外、推奨違反として記録）
+- _redirects (Sprint 19): `frontend/public/_redirects` に `/* /index.html 200` でCloudflare Pages SPA対応。npm run build でdistにコピーされる

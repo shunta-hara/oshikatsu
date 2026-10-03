@@ -1,7 +1,5 @@
 /** API 呼び出し基盤: JSON fetch ラッパー */
 
-const API_BASE = "/api/v1";
-
 export class ApiError extends Error {
   readonly status: number;
 
@@ -10,6 +8,18 @@ export class ApiError extends Error {
     this.status = status;
     this.name = "ApiError";
   }
+}
+
+/**
+ * API のベース URL を返す。
+ * - `VITE_API_BASE_URL` が設定されている場合: `${VITE_API_BASE_URL}/api/v1`
+ *   （本番: Cloudflare Pages から Render backend への cross-origin リクエスト）
+ * - 未設定の場合: `/api/v1`
+ *   （開発: Vite の `/api` プロキシが localhost:5000 に転送する）
+ */
+export function getApiBase(): string {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  return baseUrl ? `${baseUrl}/api/v1` : "/api/v1";
 }
 
 /**
@@ -30,7 +40,7 @@ export async function apiFetch<T>(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${getApiBase()}${path}`, {
     ...options,
     headers,
   });
