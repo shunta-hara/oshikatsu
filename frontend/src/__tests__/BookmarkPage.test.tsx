@@ -1,17 +1,21 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BookmarkPage } from "../pages/BookmarkPage";
 import * as bookmarkApi from "../api/bookmark";
+import * as authApi from "../api/auth";
 import { ApiError } from "../api/client";
+import { AuthProvider } from "../context/AuthContext";
 import type { BookmarksPaginatedResponse } from "../types/bookmark";
 
 vi.mock("../api/bookmark");
+vi.mock("../api/auth");
 const mockGetBookmarks = vi.mocked(bookmarkApi.getBookmarks);
 // BookmarkButton 内で addBookmark/removeBookmark が呼ばれる可能性があるためモック
 vi.mocked(bookmarkApi.addBookmark).mockResolvedValue(undefined);
 vi.mocked(bookmarkApi.removeBookmark).mockResolvedValue(undefined);
+vi.mocked(authApi.logout).mockResolvedValue(undefined);
 
 function makeBookmarkPage(
   overrides: Partial<BookmarksPaginatedResponse> = {},
@@ -41,18 +45,29 @@ const sampleItem = {
 };
 
 function renderPage() {
+  const futureDate = new Date(Date.now() + 3600000).toISOString();
+  localStorage.setItem("auth_token", "valid-token");
+  localStorage.setItem("auth_expires_at", futureDate);
+
   return render(
-    <MemoryRouter>
-      <BookmarkPage />
-    </MemoryRouter>,
+    <AuthProvider>
+      <MemoryRouter>
+        <Routes>
+          <Route path="*" element={<BookmarkPage />} />
+          <Route path="/auth" element={<div>認証ページ</div>} />
+        </Routes>
+      </MemoryRouter>
+    </AuthProvider>,
   );
 }
 
 describe("BookmarkPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();
     vi.mocked(bookmarkApi.addBookmark).mockResolvedValue(undefined);
     vi.mocked(bookmarkApi.removeBookmark).mockResolvedValue(undefined);
+    vi.mocked(authApi.logout).mockResolvedValue(undefined);
   });
 
   // ── 正常系 ────────────────────────────────────────────────────────────────
@@ -153,7 +168,9 @@ describe("BookmarkPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByRole("navigation")).toBeInTheDocument();
+      expect(
+        screen.getByRole("navigation", { name: "ページネーション" }),
+      ).toBeInTheDocument();
     });
   });
 

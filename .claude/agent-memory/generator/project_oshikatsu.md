@@ -7,7 +7,7 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-15 実装完了（2026-08-30）。
+Sprint 1-18 実装完了（Sprint 18: 2026-10-03）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
@@ -39,7 +39,9 @@ Sprint 1-15 実装完了（2026-08-30）。
   - `src/components/feed/BookmarkButton.tsx` — ブックマークトグルボタン（Sprint 15 追加）
   - `src/pages/BookmarkPage.tsx` — ブックマーク一覧ページ（Sprint 15 追加）
   - `/bookmarks` ルート追加（Sprint 15）
-  - Vitest + RTL テスト 193件合格
+  - **NavBar（Sprint 18）**: 認証済み全画面共通ナビゲーションバー（ダッシュボード・ブックマーク・ログアウト）
+  - **main.tsx に `index.css` import 追加（Sprint 18）**: CSS が一切適用されていなかった根本原因を修正
+  - Vitest + RTL テスト 203件合格（NavBar テスト 10件含む）
 
 ## 環境の注意点
 
@@ -59,5 +61,8 @@ Sprint 1-15 実装完了（2026-08-30）。
 - **loading 状態テスト**: `userEvent` は内部で全マイクロタスクを flush するため async handler の中間状態テストには `fireEvent` が適切
 - **isBookmarked**: `NewsItemResponseDto` は `bool? IsBookmarked` (nullable)。frontend schema は `z.boolean().optional()` で既存テストモックへの影響なし
 - **BookmarkService.GetBookmarksAsync**: `Include(b => b.NewsItem).ThenInclude(n => n.Oshi)` を使用。InMemory DB でも動作する
+- **CSS 未適用問題（Sprint 18）**: `main.tsx` に `import "./index.css"` がなく CSS が一切当たっていなかった。NavBar 追加時に `main.tsx` にインポート追加で解決
+- **NavBar の logout テスト互換性**: DashboardPage テストが `vi.mock("../api/auth")` でモックすると NavBar の logout も同じモックが適用される（同一モジュールのため）。NavBar を DashboardPage 内にレンダリングすれば既存テストに変更不要
+- **複数 navigation ランドマーク問題**: NavBar と FeedPagination が同じページに共存すると `getByRole("navigation")` が複数マッチして失敗。BookmarkPage.test.tsx の該当テストを `getByRole("navigation", { name: "ページネーション" })` に修正必要
 
-**How to apply:** Sprint 16 以降も `vi.resetAllMocks()` を使う。ブックマーク関連の型は `types/bookmark.ts` に集約済み。
+**How to apply:** Sprint 16 以降も `vi.resetAllMocks()` を使う。ブックマーク関連の型は `types/bookmark.ts` に集約済み。NavBar を含む認証済みページのテストには AuthProvider + MemoryRouter が必要。

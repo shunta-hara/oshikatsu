@@ -5,6 +5,7 @@ import type {
   BookmarkResponse,
   BookmarksPaginatedResponse,
 } from "../types/bookmark";
+import { NavBar } from "../components/NavBar";
 import { FeedPagination } from "../components/feed/FeedPagination";
 import { BookmarkButton } from "../components/feed/BookmarkButton";
 
@@ -40,59 +41,62 @@ export function BookmarkPage() {
   }, [page]);
 
   return (
-    <div>
-      <h2>ブックマーク一覧</h2>
+    <>
+      <NavBar />
+      <main className="page-content">
+        <h2>ブックマーク一覧</h2>
 
-      {isLoading && <p>読み込み中...</p>}
+        {isLoading && <p>読み込み中...</p>}
 
-      {!isLoading && error && (
-        <div role="alert" aria-live="assertive">
-          {error}
-        </div>
-      )}
+        {!isLoading && error && (
+          <div role="alert" aria-live="assertive">
+            {error}
+          </div>
+        )}
 
-      {!isLoading && !error && data && data.items.length === 0 && (
-        <p>ブックマークした記事はありません</p>
-      )}
+        {!isLoading && !error && data && data.items.length === 0 && (
+          <p>ブックマークした記事はありません</p>
+        )}
 
-      {!isLoading && !error && data && data.items.length > 0 && (
-        <>
-          <ul aria-label="ブックマーク一覧">
-            {data.items.map((item: BookmarkResponse) => (
-              <li key={item.id}>
-                <article>
-                  <h3>
-                    <a
-                      href={item.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.title}
-                    </a>
-                  </h3>
-                  <p>
-                    <span>{item.oshiName}</span>
-                    {" · "}
-                    <time dateTime={item.collectedAt}>
-                      {new Date(item.collectedAt).toLocaleString("ja-JP")}
-                    </time>
-                  </p>
-                  {item.summary && <p>{item.summary}</p>}
-                  <BookmarkButton
-                    newsItemId={item.newsItemId}
-                    initialIsBookmarked={true}
-                  />
-                </article>
-              </li>
-            ))}
-          </ul>
-          <FeedPagination
-            currentPage={data.page}
-            totalPages={data.totalPages}
-            onPageChange={setPage}
-          />
-        </>
-      )}
-    </div>
+        {!isLoading && !error && data && data.items.length > 0 && (
+          <>
+            <ul aria-label="ブックマーク一覧">
+              {data.items.map((item: BookmarkResponse) => (
+                <li key={item.id}>
+                  <article>
+                    <h3>
+                      <a
+                        href={item.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {item.title}
+                      </a>
+                    </h3>
+                    <p>
+                      <span>{item.oshiName}</span>
+                      {" · "}
+                      <time dateTime={item.collectedAt}>
+                        {new Date(item.collectedAt).toLocaleString("ja-JP")}
+                      </time>
+                    </p>
+                    {item.summary && <p>{item.summary}</p>}
+                    <BookmarkButton
+                      newsItemId={item.newsItemId}
+                      initialIsBookmarked={true}
+                    />
+                  </article>
+                </li>
+              ))}
+            </ul>
+            <FeedPagination
+              currentPage={data.page}
+              totalPages={data.totalPages}
+              onPageChange={setPage}
+            />
+          </>
+        )}
+      </main>
+    </>
   );
 }

@@ -19,7 +19,7 @@ export function AuthPage() {
   }
 
   return (
-    <main>
+    <main className="page-content">
       <h1>oshikatsu</h1>
       <nav role="tablist" aria-label="認証タブ">
         <button

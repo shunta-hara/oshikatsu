@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { logout } from "../api/auth";
+import { useSearchParams } from "react-router-dom";
 import { getOshis } from "../api/oshi";
 import { getUnreadCount, markAsRead } from "../api/feed";
 import { getDashboardSummary } from "../api/dashboard";
 import { ApiError } from "../api/client";
-import { useAuth } from "../context/AuthContext";
+import { NavBar } from "../components/NavBar";
 import { OshiForm } from "../components/oshi/OshiForm";
 import { OshiList } from "../components/oshi/OshiList";
 import { NewsFeedList } from "../components/feed/NewsFeedList";
@@ -22,11 +21,7 @@ import type { OshiDashboardCard } from "../types/dashboard";
  * 推し管理セクション・マルチ推しダッシュボード・フィードフィルタUI・収集ジョブ状況を含む。
  */
 export function DashboardPage() {
-  const { clearAuth } = useAuth();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   const [oshis, setOshis] = useState<OshiResponse[]>([]);
   const [isFetchingOshis, setIsFetchingOshis] = useState(false);
@@ -127,104 +122,78 @@ export function DashboardPage() {
     }
   };
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    setLogoutError(null);
-    try {
-      await logout();
-    } catch (err) {
-      // ネットワークエラーなどでもクライアント側はトークンを削除する
-      if (!(err instanceof ApiError)) {
-        setLogoutError(
-          "ログアウト中にエラーが発生しましたが、セッションを終了します",
-        );
-      }
-    } finally {
-      clearAuth();
-      navigate("/auth", { replace: true });
-    }
-  };
-
   return (
-    <main>
-      <header>
+    <>
+      <NavBar />
+      <main className="page-content">
         <h1>
           oshikatsu ダッシュボード
           <NotificationBadge count={unreadCount} />
         </h1>
-        <button onClick={() => void handleLogout()} disabled={isLoggingOut}>
-          {isLoggingOut ? "ログアウト中..." : "ログアウト"}
-        </button>
-      </header>
 
-      {logoutError && (
-        <div role="alert" aria-live="assertive">
-          {logoutError}
-        </div>
-      )}
+        <section aria-labelledby="oshi-section-title">
+          <h2 id="oshi-section-title">推し管理</h2>
+          <OshiForm onOshiAdded={handleOshiAdded} />
 
-      <section aria-labelledby="oshi-section-title">
-        <h2 id="oshi-section-title">推し管理</h2>
-        <OshiForm onOshiAdded={handleOshiAdded} />
+          {fetchOshisError && (
+            <div role="alert" aria-live="assertive">
+              {fetchOshisError}
+            </div>
+          )}
 
-        {fetchOshisError && (
-          <div role="alert" aria-live="assertive">
-            {fetchOshisError}
-          </div>
-        )}
-
-        {isFetchingOshis ? (
-          <p>読み込み中...</p>
-        ) : (
-          <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
-        )}
-      </section>
-
-      <section aria-labelledby="multi-oshi-dashboard-title">
-        <h2 id="multi-oshi-dashboard-title">マルチ推しダッシュボード</h2>
-
-        {fetchDashboardError && (
-          <div role="alert" aria-live="assertive">
-            {fetchDashboardError}
-          </div>
-        )}
-
-        {isFetchingDashboard ? (
-          <p>読み込み中...</p>
-        ) : (
-          <OshiCardList cards={dashboardCards} />
-        )}
-      </section>
-
-      <section aria-labelledby="feed-section-title">
-        <h2 id="feed-section-title">フィード</h2>
-        <OshiFilter
-          oshis={oshis}
-          selectedOshiId={selectedOshiId}
-          onChange={handleOshiFilterChange}
-        />
-
-        <section aria-labelledby="news-section-title">
-          <h3 id="news-section-title">ニュース</h3>
-          <NewsFeedList
-            key={String(selectedOshiId)}
-            oshiId={selectedOshiId ?? undefined}
-          />
+          {isFetchingOshis ? (
+            <p>読み込み中...</p>
+          ) : (
+            <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
+          )}
         </section>
 
-        <section aria-labelledby="programs-section-title">
-          <h3 id="programs-section-title">出演番組</h3>
-          <ProgramFeedList
-            key={String(selectedOshiId)}
-            oshiId={selectedOshiId ?? undefined}
-          />
-        </section>
-      </section>
+        <section aria-labelledby="multi-oshi-dashboard-title">
+          <h2 id="multi-oshi-dashboard-title">マルチ推しダッシュボード</h2>
 
-      <section aria-labelledby="collector-section-title">
-        <h2 id="collector-section-title">収集ジョブ状況</h2>
-        <CollectorStatus />
-      </section>
-    </main>
+          {fetchDashboardError && (
+            <div role="alert" aria-live="assertive">
+              {fetchDashboardError}
+            </div>
+          )}
+
+          {isFetchingDashboard ? (
+            <p>読み込み中...</p>
+          ) : (
+            <OshiCardList cards={dashboardCards} />
+          )}
+        </section>
+
+        <section aria-labelledby="feed-section-title">
+          <h2 id="feed-section-title">フィード</h2>
+          <OshiFilter
+            oshis={oshis}
+            selectedOshiId={selectedOshiId}
+            onChange={handleOshiFilterChange}
+          />
+
+          <section aria-labelledby="news-section-title">
+            <h3 id="news-section-title">ニュース</h3>
+            <NewsFeedList
+              key={String(selectedOshiId)}
+              oshiId={selectedOshiId ?? undefined}
+            />
+          </section>
+
+          <section aria-labelledby="programs-section-title">
+            <h3 id="programs-section-title">出演番組</h3>
+            <ProgramFeedList
+              key={String(selectedOshiId)}
+              oshiId={selectedOshiId ?? undefined}
+            />
+          </section>
+        </section>
+
+        <section aria-labelledby="collector-section-title">
+          <h2 id="collector-section-title">収集ジョブ状況</h2>
+          <CollectorStatus />
+        </section>
+      </main>
+    </>
   );
 }
