@@ -41,6 +41,8 @@ GitHub Actions (cron) ────┘  X-Api-Key で内部API経由書き込み
 8. **HTTPS 前提の設定**: 本番は各サービスが HTTPS を終端する。backend の `UseHttpsRedirection` などが Render のプロキシ環境と矛盾しないことを確認する
 
 ## 利用者側で必要な作業（Claude では代行できない）
+手順は [deploy-guide.md](deploy-guide.md) を参照。
+
 - Cloudflare / Render / Neon のアカウント作成と、GitHub リポジトリとの連携
 - 各サービスへの秘密情報（接続文字列・JWT 秘密鍵・API キー）の登録
 
