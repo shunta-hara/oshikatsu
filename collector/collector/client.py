@@ -150,6 +150,19 @@ class BackendClient:
 
         return self._post_with_retry("/api/v1/internal/programs", payload)
 
+    def check_health(self) -> bool:
+        """
+        /api/v1/health を呼び出し、200 OK なら True を返す。
+        エラー・非 200 の場合は False を返す（リトライしない）。
+        コールドスタート確認用のヘルスポーリングに使う。
+        """
+        url = f"{self._base_url}/api/v1/health"
+        try:
+            response = self._session.get(url, timeout=self._timeout)
+            return response.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
+
     def _get_with_retry(self, path: str) -> Any:
         """
         指数バックオフ付きリトライで GET を実行する。

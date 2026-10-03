@@ -8,6 +8,7 @@ import sys
 
 from collector.client import BackendClient
 from collector.config import load_config
+from collector.health_wait import wait_for_backend
 from collector.logger import get_logger, setup_logging
 from collector.news_collector import run_news_collection
 from collector.news_fetcher import NewsFetcher
@@ -27,6 +28,11 @@ def main() -> None:
         sys.exit(1)
 
     client = BackendClient(config)
+
+    # コールドスタート対策: 収集を開始する前に backend の起動を確認する
+    if not wait_for_backend(client):
+        logger.error("Backend is unavailable. Skipping collection and exiting.")
+        sys.exit(1)
 
     news_fetcher = NewsFetcher(
         timeout=config.request_timeout_seconds,

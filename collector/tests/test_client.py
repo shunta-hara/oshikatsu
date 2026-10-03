@@ -417,6 +417,61 @@ class TestPostJobLog:
                 )
 
 
+class TestCheckHealth:
+    HEALTH_URL = "http://backend:8080/api/v1/health"
+
+    # ── 正常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_check_health_returns_true_on_200(self) -> None:
+        resp.add(resp.GET, self.HEALTH_URL, json={"status": "ok"}, status=200)
+        client = BackendClient(make_config())
+        assert client.check_health() is True
+
+    @resp.activate
+    def test_check_health_does_not_retry_on_200(self) -> None:
+        resp.add(resp.GET, self.HEALTH_URL, json={"status": "ok"}, status=200)
+        client = BackendClient(make_config())
+        client.check_health()
+        # ヘルスチェックはリトライしないので1回だけ呼ばれる
+        assert len(resp.calls) == 1
+
+    # ── 異常系 ────────────────────────────────────────────────────────────────
+
+    @resp.activate
+    def test_check_health_returns_false_on_500(self) -> None:
+        resp.add(resp.GET, self.HEALTH_URL, json={}, status=500)
+        client = BackendClient(make_config())
+        assert client.check_health() is False
+
+    @resp.activate
+    def test_check_health_returns_false_on_503(self) -> None:
+        resp.add(resp.GET, self.HEALTH_URL, json={}, status=503)
+        client = BackendClient(make_config())
+        assert client.check_health() is False
+
+    @resp.activate
+    def test_check_health_returns_false_on_connection_error(self) -> None:
+        import requests.exceptions as req_exc
+        resp.add(
+            resp.GET,
+            self.HEALTH_URL,
+            body=req_exc.ConnectionError("Connection refused"),
+        )
+        client = BackendClient(make_config())
+        assert client.check_health() is False
+
+    @resp.activate
+    def test_check_health_does_not_retry_on_failure(self) -> None:
+        """ヘルスチェックは失敗してもリトライしない（ポーリングは呼び出し元が行う）"""
+        resp.add(resp.GET, self.HEALTH_URL, json={}, status=500)
+        client = BackendClient(make_config(max_retries=3))
+        result = client.check_health()
+        assert result is False
+        # リトライしないので1回だけ呼ばれる
+        assert len(resp.calls) == 1
+
+
 class TestHelpers:
     def test_to_iso_with_utc(self) -> None:
         dt = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)

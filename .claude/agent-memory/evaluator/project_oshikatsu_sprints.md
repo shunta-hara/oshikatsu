@@ -5,11 +5,28 @@ metadata:
   type: project
 ---
 
-Sprint 20 評価完了（合格）。FEAT-021（backendコンテナ化・CORS・HTTPS・マイグレーション自動適用）の全必須観点が合格。
+Sprint 21 評価完了（合格）。FEAT-022（collectorのGitHub Actions定期実行・コールドスタート対策）の全必須観点が合格。全21スプリント完了。
 
-**Why:** FEAT-001〜022をカバーするために21スプリントが計画・実施された。
+**Why:** FEAT-001〜022をカバーするために21スプリントが計画・実施された。Sprint 21が最終スプリント。
 
-**How to apply:** 新規スプリント開始時はこのプロジェクトの現在状態を参照する。
+**How to apply:** 全スプリント完了。新規機能追加時は新仕様書から再プランニングする。
+
+## Sprint 21 評価 (2026-10-03): 合格
+
+- 対象: FEAT-022（collectorのGitHub Actions定期実行・コールドスタート対策）
+- 結果: **合格**
+- ビルド/テスト: docker build 成功・130/130（test_health_wait.py 7テスト含む）
+- 動的テスト:
+  1. `check_health()` backend未起動→False ✅
+  2. タイムアウト→sys.exit(1) + ERRORログ確認 ✅
+  3. 遅延スタート（collector先行20s→backend起動）→attempt 9でready検出・exit 0 ✅
+  4. backend起動済み→即時成功（attempt 1）✅
+- コード品質: 必須違反0件、型ヒント完備（wait_for_backend→bool、check_health→bool）
+- Secrets未設定時: ValueError→stderr出力→sys.exit(1)で分かりやすくFAIL（推奨事項として評価）
+- 技術メモ:
+  - health_wait.py: `time.monotonic()` でdeadline管理、`min(poll_interval, remaining)` でオーバーシュート防止
+  - config.py `_require()`: 空文字列もエラー扱い（GitHub Secretsの未設定展開に対応）
+  - Dockerfile: requirements.txt + requirements-dev.txt 両方インストール（pytestをコンテナ内で実行可能）
 
 ## Sprint 20 評価 (2026-10-03) - 2回目: 合格
 
