@@ -94,6 +94,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // 推し管理サービス
 builder.Services.AddScoped<IOshiService, OshiService>();
 
+// GitHub Actions workflow_dispatch サービス（シングルトン: IHttpClientFactory・ILogger に依存）
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IGitHubDispatchService, GitHubDispatchService>();
+
 // collector 内部APIサービス
 builder.Services.AddScoped<IInternalCollectorService, InternalCollectorService>();
 

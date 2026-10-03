@@ -15,10 +15,14 @@ namespace OshikatsuApi.Controllers;
 public class OshisController : ControllerBase
 {
     private readonly IOshiService _oshiService;
+    private readonly IGitHubDispatchService _githubDispatchService;
 
-    public OshisController(IOshiService oshiService)
+    public OshisController(
+        IOshiService oshiService,
+        IGitHubDispatchService githubDispatchService)
     {
         _oshiService = oshiService;
+        _githubDispatchService = githubDispatchService;
     }
 
     /// <summary>推しを登録する</summary>
@@ -37,6 +41,9 @@ public class OshisController : ControllerBase
         try
         {
             var result = await _oshiService.CreateAsync(userId, dto.Name);
+            // Fire-and-forget: dispatch failures must not block or fail oshi registration.
+            // TriggerCollectAsync catches all exceptions internally and logs them.
+            _ = _githubDispatchService.TriggerCollectAsync(result.Id);
             return StatusCode(StatusCodes.Status201Created, result);
         }
         catch (OshiLimitExceededException)

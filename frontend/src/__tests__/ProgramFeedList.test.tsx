@@ -205,9 +205,7 @@ describe("ProgramFeedList", () => {
     render(<ProgramFeedList />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText("まだ出演番組情報がありません"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("まだ出演情報がありません")).toBeInTheDocument();
     });
   });
 

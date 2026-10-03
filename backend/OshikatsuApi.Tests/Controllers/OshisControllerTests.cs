@@ -14,12 +14,16 @@ namespace OshikatsuApi.Tests.Controllers;
 public class OshisControllerTests
 {
     private readonly IOshiService _oshiService;
+    private readonly IGitHubDispatchService _githubDispatchService;
     private readonly OshisController _sut;
 
     public OshisControllerTests()
     {
         _oshiService = Substitute.For<IOshiService>();
-        _sut = new OshisController(_oshiService);
+        _githubDispatchService = Substitute.For<IGitHubDispatchService>();
+        _githubDispatchService.TriggerCollectAsync(Arg.Any<int>())
+            .Returns(Task.CompletedTask);
+        _sut = new OshisController(_oshiService, _githubDispatchService);
         SetupAuthenticatedUser(userId: 1);
     }
 

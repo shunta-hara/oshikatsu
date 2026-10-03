@@ -12,7 +12,7 @@
                   ▼
               Render（backend） ──> Neon（PostgreSQL）
                   ▲
-GitHub Actions ───┘ 6時間ごとに collector を実行
+GitHub Actions ───┘ 2時間ごとに collector を実行
 ```
 
 ## 作業中に控える値
@@ -34,7 +34,7 @@ GitHub Actions ───┘ 6時間ごとに collector を実行
 Render と Cloudflare は GitHub のコードを取りに行くので、先に push が必要です。Claude に「push して」と頼めば代行します。
 
 - [ ] `master` を push する
-- [ ] 定期実行ワークフローを一時停止する（手順 7 まで、6時間ごとに失敗通知が届くのを防ぐため）
+- [ ] 定期実行ワークフローを一時停止する（手順 7 まで、2時間ごとに失敗通知が届くのを防ぐため）
   ```bash
   gh workflow disable collect.yml
   ```
@@ -165,7 +165,46 @@ openssl rand -hex 32      # → collector API キー
    ```
    GitHub の **Actions** タブで **Run workflow** を押しても同じです。
 
-## 手順 8. 動作確認
+## 手順 8. 推し登録直後の即時収集を有効にする（オプション）
+
+推しを登録した直後に GitHub Actions を自動起動し、数分以内にニュースを表示させるための設定です。設定しなくても2時間ごとの定期収集は動作します。
+
+### 8a. fine-grained PAT を作成する
+
+1. GitHub → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
+2. 設定を入力する
+
+   | 項目 | 値 |
+   |---|---|
+   | Token name | `oshikatsu-dispatch`（分かりやすい名前） |
+   | Expiration | 任意（有効期限が短いほど安全。期限切れ後は再作成が必要） |
+   | Repository access | **Only select repositories** → `shunta-hara/oshikatsu`（このリポジトリのみ） |
+   | Permissions → Actions | **Read and write** |
+
+3. **Generate token** を押し、表示されたトークン（`github_pat_...`）を控える  
+   **画面を閉じると二度と表示されません。必ずコピーしてください。**
+
+### 8b. Render に環境変数を追加する
+
+Render の `oshikatsu-api` → **Environment** を開き、以下の2つを追加する。
+
+| Key | Value |
+|---|---|
+| `GITHUB_DISPATCH_TOKEN` | 手順 8a で控えた PAT |
+| `GITHUB_REPOSITORY` | `shunta-hara/oshikatsu`（`owner/リポジトリ名` の形式） |
+
+- `GITHUB_WORKFLOW_FILE` は未設定で `collect.yml` が使われる（変更した場合は設定する）。
+- `GITHUB_REF` は未設定で `master` が使われる（変更した場合は設定する）。
+- 保存すると自動で再デプロイされる。
+
+### 動作確認
+
+推しを1人登録し、2〜3分後にダッシュボードにニュースが表示されれば成功です。  
+GitHub の **Actions** タブで `collect.yml` の実行履歴を確認できます。
+
+---
+
+## 手順 9. 動作確認
 
 - [ ] frontend の URL を開くとログイン画面が出る（Render がスリープしていると、最初の応答に1分ほどかかる）
 - [ ] 新規登録して、推しを1人追加する
@@ -197,7 +236,7 @@ openssl rand -hex 32      # → collector API キー
 | Cloudflare Pages | 静的配信は無制限、ビルドは月 500 回 | push 1回につきビルド1回 | ビルドが止まる（課金なし） |
 | Render Hobby | 稼働 750 時間/月、送信帯域 5 GB/月 | 稼働は最大でも 744 時間/月なので収まる。API の応答は小さい JSON なので、帯域も個人利用なら十分 | 稼働時間の超過: 月末までサービス停止（課金なし）。帯域の超過: 支払い方法を登録していると $0.15/GB が請求される |
 | Neon Free | ストレージ 0.5 GB、100 CU 時間/月、期限なし | 5分アクセスがないと自動停止するので、使った分だけ消費する。ニュースのデータは小さく、0.5 GB に届くのはかなり先 | DB が止まる（課金なし） |
-| GitHub Actions | private リポジトリで 2,000 分/月 | 1回 2〜3 分 × 1日 4回 × 30日 ＝ 約 240〜360 分/月 | 支払い方法を登録していなければ実行が止まる |
+| GitHub Actions | private リポジトリで 2,000 分/月 | 1回 1〜2 分 × 1日 12回 × 30日 ＝ 約 360〜720 分/月（推し10人の場合。登録直後の収集は1回約1分） | 支払い方法を登録していなければ実行が止まる |
 
 ### お金がかかる可能性があるケース
 - **Render に支払い方法を登録した状態で、帯域 5 GB を超えたとき**: 超過分に $0.15/GB が請求されます。支払い方法を登録しなければ請求はできませんが、そのとき超過分がどう扱われるかは公式に明記されていません。サービスが止まる可能性があります。

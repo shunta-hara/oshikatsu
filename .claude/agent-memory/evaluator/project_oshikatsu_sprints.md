@@ -5,11 +5,32 @@ metadata:
   type: project
 ---
 
-Sprint 23 評価完了（合格、1回目）。FEAT-025（collector一括送信・単一推し収集モード）・FEAT-024（番組重複collector対策）両方合格。167/167 全テスト通過。
+Sprint 24 評価完了（合格、1回目）。FEAT-026（推し登録直後即時収集）・FEAT-024（frontend表記変更）両方合格。backend 342/342・frontend 217/217 全テスト通過。
 
-**Why:** Sprint 23はFEAT-025+FEAT-024(collector)。全完了条件14/14達成。
+**Why:** Sprint 24はFEAT-026+FEAT-024(frontend)。GitHubDispatchService singleton + fire-and-forget 設計確認済み。
 
-**How to apply:** Sprint 23合格。次は Sprint 24（推し登録直後の即時収集・frontend の表記変更）。
+**How to apply:** Sprint 24合格。次は Sprint 25（細かな不具合・設定の修正 FEAT-027）。
+
+## Sprint 24 評価 (2026-10-03): 合格（1回目）
+
+- 対象: FEAT-026（推し登録直後の即時収集）・FEAT-024（frontend 表記変更）
+- 結果: **合格**
+- ビルド: 0エラー
+- テスト: backend 342/342, frontend 217/217
+
+### 動的テスト
+- GITHUB_DISPATCH_TOKEN 未設定 → POST /api/v1/oshis 201・info log「スキップします」✅
+- ダミートークン+存在しないリポジトリ → 201 即座返却（fire-and-forget）→背後で 401・warn log（トークンなし）✅
+- fire-and-forget: GitHubDispatchService singleton、DbContext非依存、全例外キャッチ ✅
+
+### frontend 表記変更
+- 「出演番組」→「出演情報」: DashboardPage・ProgramFeedList（aria-label・空状態）✅
+- 「放送日（時）」→「掲載日」: git 歴史確認。元から UI に「放送日」ラベルなし（time要素のみ）→ 0件変更で trivially satisfied ✅
+- BookmarkPage: 「出演番組」なし ✅
+
+### deploy-guide.md
+- 手順 8 追加（fine-grained PAT 作成手順・Render 環境変数登録手順）✅
+- 旧手順 8 → 手順 9 に繰り下がり、番号崩れなし ✅
 
 ## Sprint 23 評価 (2026-10-03): 合格（1回目）
 

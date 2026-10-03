@@ -20,18 +20,21 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
   const [name, setName] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
     setFieldError(null);
     setApiError(null);
+    setSuccessMessage(null);
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFieldError(null);
     setApiError(null);
+    setSuccessMessage(null);
 
     const result = addOshiSchema.safeParse({ name });
     if (!result.success) {
@@ -44,6 +47,7 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
       const oshi = await createOshi(result.data.name);
       onOshiAdded(oshi);
       setName("");
+      setSuccessMessage("登録しました。数分後にニュースが表示されます");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 422) {
@@ -85,6 +89,12 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
       {apiError && (
         <div role="alert" aria-live="assertive">
           {apiError}
+        </div>
+      )}
+
+      {successMessage && (
+        <div role="status" aria-live="polite">
+          {successMessage}
         </div>
       )}
 

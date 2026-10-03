@@ -42,6 +42,22 @@ describe("OshiForm", () => {
     expect(onOshiAdded).toHaveBeenCalledWith(dummyOshi);
   });
 
+  it("登録成功後に「数分後にニュースが表示されます」メッセージが表示される", async () => {
+    const user = userEvent.setup();
+    mockCreateOshi.mockResolvedValueOnce(dummyOshi);
+
+    renderForm();
+
+    await user.type(screen.getByLabelText("推しの名前"), "鈴木一郎");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("登録しました。数分後にニュースが表示されます"),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("登録成功後にフォームがリセットされる", async () => {
     const user = userEvent.setup();
     mockCreateOshi.mockResolvedValueOnce(dummyOshi);

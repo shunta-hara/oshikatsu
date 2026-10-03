@@ -9,12 +9,12 @@ import { FeedPagination } from "./FeedPagination";
 import { DateRangeFilter } from "./DateRangeFilter";
 
 interface ProgramFeedListProps {
-  /** 絞り込む推しのID。未指定の場合は全推しの出演番組を表示する */
+  /** 絞り込む推しのID。未指定の場合は全推しの出演情報を表示する */
   oshiId?: number;
 }
 
 /**
- * ログインユーザーの推し全員分（または特定の推し）の出演番組一覧を表示するコンポーネント。
+ * ログインユーザーの推し全員分（または特定の推し）の出演情報一覧を表示するコンポーネント。
  * ページネーション・エラー・空状態・日付範囲フィルタを処理する。
  */
 export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
@@ -75,13 +75,13 @@ export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
         <p>
           {isFiltered
             ? "該当する番組が見つかりません"
-            : "まだ出演番組情報がありません"}
+            : "まだ出演情報がありません"}
         </p>
       )}
 
       {!isLoading && !error && data && data.items.length > 0 && (
         <div>
-          <ul aria-label="出演番組一覧">
+          <ul aria-label="出演情報一覧">
             {data.items.map((item: ProgramAppearance) => (
               <li key={item.id}>
                 <article>

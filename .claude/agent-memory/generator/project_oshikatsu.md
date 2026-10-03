@@ -7,7 +7,7 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-23 実装完了（Sprint 23: 2026-10-03）。
+Sprint 1-24 実装完了（Sprint 24: 2026-10-03）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
@@ -19,7 +19,7 @@ Sprint 1-23 実装完了（Sprint 23: 2026-10-03）。
 - **番組重複フィルタ（FEAT-024）**: `PROGRAM_KEYWORDS` 定数による候補絞り込み。同実行のニュース URL との重複除外。
 - **workflow 更新（FEAT-025）**: `workflow_dispatch` に `oshi_id` 入力追加。concurrency グループで全体実行と特定推し実行を分離。
 
-### backend/（Sprint 1-6, 10-16, 20, 22）
+### backend/（Sprint 1-6, 10-16, 20, 22, 24）
 - `backend/OshikatsuApi.sln` — ソリューションファイル
 - `backend/OshikatsuApi/` — ASP.NET Core 10 Web API プロジェクト
   - EF Core + Npgsql で PostgreSQL 接続
@@ -36,7 +36,8 @@ Sprint 1-23 実装完了（Sprint 23: 2026-10-03）。
   - **CORS 設定済み**: `http://localhost:5173` を許可（FrontendCorsPolicy）
   - **一括登録API（Sprint 22/FEAT-023）**: `POST /api/v1/internal/news/batch`, `POST /api/v1/internal/programs/batch`（APIキー認証）
   - **FEAT-024 番組重複排除**: 番組一括・単件保存時にニュースの既存 sourceUrl をスキップ。FeedService・DashboardService で番組一覧からニュースと重複する番組を除外
-- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（325テスト合格）
+  - **FEAT-026 即時収集 dispatch（Sprint 24）**: `IGitHubDispatchService` / `GitHubDispatchService` 追加。推し登録後に fire-and-forget で GitHub Actions workflow_dispatch を起動。env: GITHUB_DISPATCH_TOKEN / GITHUB_REPOSITORY / GITHUB_WORKFLOW_FILE / GITHUB_REF。未設定時はスキップ。失敗時も 201 を返す。トークンはログに出さない。
+- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（342テスト合格）
 
 ### frontend/（Sprint 7-15）
 - `frontend/` — Vite + React + TypeScript プロジェクト
@@ -49,7 +50,9 @@ Sprint 1-23 実装完了（Sprint 23: 2026-10-03）。
   - `/bookmarks` ルート追加（Sprint 15）
   - **NavBar（Sprint 18）**: 認証済み全画面共通ナビゲーションバー（ダッシュボード・ブックマーク・ログアウト）
   - **main.tsx に `index.css` import 追加（Sprint 18）**: CSS が一切適用されていなかった根本原因を修正
-  - Vitest + RTL テスト 203件合格（NavBar テスト 10件含む）
+  - **FEAT-026 成功メッセージ（Sprint 24）**: OshiForm で推し追加成功後に「登録しました。数分後にニュースが表示されます」を表示
+  - **FEAT-024 表記変更（Sprint 24）**: 画面上「出演番組」→「出演情報」に変更（ProgramFeedList・DashboardPage の見出し・空状態メッセージ・aria-label）
+  - Vitest + RTL テスト 217件合格
 
 ## 環境の注意点
 

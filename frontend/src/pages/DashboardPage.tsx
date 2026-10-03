@@ -181,7 +181,7 @@ export function DashboardPage() {
           </section>
 
           <section aria-labelledby="programs-section-title">
-            <h3 id="programs-section-title">出演番組</h3>
+            <h3 id="programs-section-title">出演情報</h3>
             <ProgramFeedList
               key={String(selectedOshiId)}
               oshiId={selectedOshiId ?? undefined}
