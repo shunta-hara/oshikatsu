@@ -111,8 +111,9 @@ openssl rand -hex 32      # → collector API キー
 ## 手順 5. Cloudflare Pages に frontend を置く
 
 1. [dash.cloudflare.com](https://dash.cloudflare.com) でサインアップする（クレジットカード不要）
-2. **Workers & Pages → Create → Pages → Import an existing Git repository** を選び、GitHub の `shunta-hara/oshikatsu` を連携する
-   - Create を押すと、最初に **Workers** の作成画面が出る。必ず **Pages** を選び直すこと。設定画面に「Deploy command（`npx wrangler deploy`）」の欄があれば、それは Workers の画面
+2. **Workers & Pages → Create** を押し、「Make something new」画面の一番下にある **「Need to use the legacy Pages workflow? Continue to Pages」の Continue to Pages** を押す。続けて **Import an existing Git repository** を選び、GitHub の `shunta-hara/oshikatsu` を連携する
+   - 「Continue with GitHub」など画面中央のボタンは **Workers** の作成になるので押さない。設定画面に「Deploy command（`npx wrangler deploy`）」の欄があれば、それは Workers の画面
+   - 「legacy」と表示されるが、Pages は引き続き無料で使える
    - 誤って Workers で作ってしまった場合は、そのプロジェクトを削除してから Pages で作り直す
 3. 設定を入力する
 
