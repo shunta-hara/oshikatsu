@@ -5,6 +5,41 @@ metadata:
   type: project
 ---
 
+Sprint 26 評価：合格（1回目）。219/219 全テスト通過。FEAT-028 Sprint A 全完了条件確認済み。
+
+**Why:** Sprint 26 は FEAT-028 Sprint A（デザイントークン・共通コンポーネント・NavBar・認証画面カード化）。App.css 削除、Vite テンプレート名残除去、ローズ系デザイントークン一元管理、コントラスト比 4.5:1 以上確認済み。
+
+**How to apply:** Sprint 26 合格。次は Sprint 27（Webデザイン刷新 Sprint B — ダッシュボード・ブックマーク一覧のカード型レイアウト）。
+
+## Sprint 26 評価 (2026-10-04): 合格（1回目）
+
+- 対象: FEAT-028 Sprint A（Webデザイン刷新 基盤）
+- 結果: **合格**
+- ビルド: 0エラー
+- テスト: 219/219 PASS
+
+### 動的テスト
+- App.css 削除・参照なし ✅
+- Vite テンプレート名残なし（aa3bff, --code-bg, --social-bg, prefers-color-scheme） ✅
+- #root 固定幅なし（min-height + flex のみ） ✅
+- トークン :root 一元管理 ✅
+- 認証画面カード中央配置（スクリーンショット確認） ✅
+- NavBar（ダッシュボード・ブックマーク・ログアウト・active クラス）✅
+- キーボードフォーカス: ボタン 2px solid rose, NavBar リンクはブラウザデフォルト（可視） ✅
+- 375px 横スクロールなし ✅
+
+### コントラスト比（計算検証）
+- accent (#c0375f) on white: 5.34:1 ✅（CSS クレーム 4.93:1 より高め）
+- text (#1a0d12) on bg (#fff5f7): 17.83:1 ✅
+- text-muted (#5c4d55) on white: 7.94:1 ✅（CSS クレーム 6.77:1 より高め）
+- danger (#c0392b) on white: 5.44:1 ✅（CSS クレーム 5.05:1 より高め）
+
+### 技術メモ
+- index.css: #fff0ef, #f0faf4 など error/success 背景色が :root 外に直書き（Sprint B で整理余地）
+- NavBar <a> に :focus-visible カスタムスタイルなし（ブラウザデフォルト適用、Sprint B で補強推奨）
+
+---
+
 Sprint 25 評価：合格（2回目）。360/360 テスト通過。FEAT-027 全項目確認済み。
 
 **Why:** Sprint 25 は FEAT-027（trailing slash/case-insensitive/Swagger Production 非公開）。1回目は FeedServiceTests.cs 既存39件削除で不合格。2回目で HEAD 復元+5件追加(360件)で合格。

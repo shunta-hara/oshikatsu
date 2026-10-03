@@ -18,6 +18,7 @@ export function FeedPagination({
   return (
     <nav aria-label="ページネーション">
       <button
+        className="btn-secondary"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage <= 1}
         aria-label="前のページ"
@@ -28,6 +29,7 @@ export function FeedPagination({
         {currentPage} / {totalPages} ページ
       </span>
       <button
+        className="btn-secondary"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage >= totalPages}
         aria-label="次のページ"

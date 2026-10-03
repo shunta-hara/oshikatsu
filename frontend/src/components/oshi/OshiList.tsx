@@ -15,7 +15,9 @@ export function OshiList({ oshis, onOshiDeleted }: OshiListProps) {
 
   if (oshis.length === 0) {
     return (
-      <p>まだ推しが登録されていません。上のフォームから追加してください。</p>
+      <p className="empty-state">
+        まだ推しが登録されていません。上のフォームから追加してください。
+      </p>
     );
   }
 
@@ -52,9 +54,12 @@ export function OshiList({ oshis, onOshiDeleted }: OshiListProps) {
         <li key={oshi.id}>
           <span>{oshi.name}</span>
           {deleteErrors[oshi.id] && (
-            <span role="alert">{deleteErrors[oshi.id]}</span>
+            <span role="alert" className="field-error">
+              {deleteErrors[oshi.id]}
+            </span>
           )}
           <button
+            className="btn-danger"
             onClick={() => void handleDelete(oshi)}
             disabled={deletingId === oshi.id}
             aria-label={`${oshi.name}を削除`}

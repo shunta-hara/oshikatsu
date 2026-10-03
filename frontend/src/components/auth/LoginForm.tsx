@@ -71,8 +71,13 @@ export function LoginForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="ログインフォーム">
-      <div>
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      aria-label="ログインフォーム"
+      className="auth-form"
+    >
+      <div className="form-field">
         <label htmlFor="login-email">メールアドレス</label>
         <input
           id="login-email"
@@ -85,13 +90,13 @@ export function LoginForm() {
           aria-invalid={fieldErrors.email !== undefined}
         />
         {fieldErrors.email && (
-          <span id="login-email-error" role="alert">
+          <span id="login-email-error" role="alert" className="field-error">
             {fieldErrors.email}
           </span>
         )}
       </div>
 
-      <div>
+      <div className="form-field">
         <label htmlFor="login-password">パスワード</label>
         <input
           id="login-password"
@@ -106,19 +111,19 @@ export function LoginForm() {
           aria-invalid={fieldErrors.password !== undefined}
         />
         {fieldErrors.password && (
-          <span id="login-password-error" role="alert">
+          <span id="login-password-error" role="alert" className="field-error">
             {fieldErrors.password}
           </span>
         )}
       </div>
 
       {apiError && (
-        <div role="alert" aria-live="assertive">
+        <div role="alert" aria-live="assertive" className="error-message">
           {apiError}
         </div>
       )}
 
-      <button type="submit" disabled={isLoading}>
+      <button type="submit" disabled={isLoading} className="btn-primary">
         {isLoading ? "ログイン中..." : "ログイン"}
       </button>
     </form>

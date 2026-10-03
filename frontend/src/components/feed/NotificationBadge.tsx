@@ -13,25 +13,7 @@ export function NotificationBadge({ count }: NotificationBadgeProps) {
   }
 
   return (
-    <span
-      aria-label={`未読 ${count} 件`}
-      role="status"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: "1.25rem",
-        height: "1.25rem",
-        padding: "0 0.25rem",
-        borderRadius: "9999px",
-        backgroundColor: "#e53e3e",
-        color: "#fff",
-        fontSize: "0.75rem",
-        fontWeight: "bold",
-        lineHeight: 1,
-        marginLeft: "0.5rem",
-      }}
-    >
+    <span aria-label={`未読 ${count} 件`} role="status" className="badge">
       {count}
     </span>
   );

@@ -80,8 +80,13 @@ export function RegisterForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate aria-label="新規登録フォーム">
-      <div>
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      aria-label="新規登録フォーム"
+      className="auth-form"
+    >
+      <div className="form-field">
         <label htmlFor="register-email">メールアドレス</label>
         <input
           id="register-email"
@@ -96,13 +101,13 @@ export function RegisterForm() {
           aria-invalid={fieldErrors.email !== undefined}
         />
         {fieldErrors.email && (
-          <span id="register-email-error" role="alert">
+          <span id="register-email-error" role="alert" className="field-error">
             {fieldErrors.email}
           </span>
         )}
       </div>
 
-      <div>
+      <div className="form-field">
         <label htmlFor="register-password">パスワード</label>
         <input
           id="register-password"
@@ -117,13 +122,17 @@ export function RegisterForm() {
           aria-invalid={fieldErrors.password !== undefined}
         />
         {fieldErrors.password && (
-          <span id="register-password-error" role="alert">
+          <span
+            id="register-password-error"
+            role="alert"
+            className="field-error"
+          >
             {fieldErrors.password}
           </span>
         )}
       </div>
 
-      <div>
+      <div className="form-field">
         <label htmlFor="register-confirm-password">パスワード（確認）</label>
         <input
           id="register-confirm-password"
@@ -138,19 +147,23 @@ export function RegisterForm() {
           aria-invalid={fieldErrors.confirmPassword !== undefined}
         />
         {fieldErrors.confirmPassword && (
-          <span id="register-confirm-error" role="alert">
+          <span
+            id="register-confirm-error"
+            role="alert"
+            className="field-error"
+          >
             {fieldErrors.confirmPassword}
           </span>
         )}
       </div>
 
       {apiError && (
-        <div role="alert" aria-live="assertive">
+        <div role="alert" aria-live="assertive" className="error-message">
           {apiError}
         </div>
       )}
 
-      <button type="submit" disabled={isLoading}>
+      <button type="submit" disabled={isLoading} className="btn-primary">
         {isLoading ? "登録中..." : "新規登録"}
       </button>
     </form>

@@ -44,9 +44,16 @@ export function NewsSearchBox({
         onChange={(e) => setInputValue(e.target.value)}
         placeholder="タイトル・本文で検索"
       />
-      <button type="submit">検索</button>
+      <button type="submit" className="btn-primary">
+        検索
+      </button>
       {value && (
-        <button type="button" onClick={handleClear} aria-label="検索をクリア">
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleClear}
+          aria-label="検索をクリア"
+        >
           クリア
         </button>
       )}

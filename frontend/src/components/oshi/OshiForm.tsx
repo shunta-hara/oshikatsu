@@ -67,7 +67,7 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
 
   return (
     <form onSubmit={handleSubmit} aria-label="推し追加フォーム">
-      <div>
+      <div className="form-field">
         <label htmlFor="oshi-name">推しの名前</label>
         <input
           id="oshi-name"
@@ -80,25 +80,25 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
           aria-describedby={fieldError ? "oshi-name-error" : undefined}
         />
         {fieldError && (
-          <span id="oshi-name-error" role="alert">
+          <span id="oshi-name-error" role="alert" className="field-error">
             {fieldError}
           </span>
         )}
       </div>
 
       {apiError && (
-        <div role="alert" aria-live="assertive">
+        <div role="alert" aria-live="assertive" className="error-message">
           {apiError}
         </div>
       )}
 
       {successMessage && (
-        <div role="status" aria-live="polite">
+        <div role="status" aria-live="polite" className="success-message">
           {successMessage}
         </div>
       )}
 
-      <button type="submit" disabled={isLoading}>
+      <button type="submit" disabled={isLoading} className="btn-primary">
         {isLoading ? "登録中..." : "追加"}
       </button>
     </form>

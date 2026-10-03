@@ -19,28 +19,33 @@ export function AuthPage() {
   }
 
   return (
-    <main className="page-content">
-      <h1>oshikatsu</h1>
-      <nav role="tablist" aria-label="認証タブ">
-        <button
-          role="tab"
-          aria-selected={activeTab === "login"}
-          onClick={() => setActiveTab("login")}
-        >
-          ログイン
-        </button>
-        <button
-          role="tab"
-          aria-selected={activeTab === "register"}
-          onClick={() => setActiveTab("register")}
-        >
-          新規登録
-        </button>
-      </nav>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-title">oshikatsu</h1>
 
-      <div role="tabpanel">
-        {activeTab === "login" ? <LoginForm /> : <RegisterForm />}
+        <nav className="auth-tabs" role="tablist" aria-label="認証タブ">
+          <button
+            className="auth-tab"
+            role="tab"
+            aria-selected={activeTab === "login"}
+            onClick={() => setActiveTab("login")}
+          >
+            ログイン
+          </button>
+          <button
+            className="auth-tab"
+            role="tab"
+            aria-selected={activeTab === "register"}
+            onClick={() => setActiveTab("register")}
+          >
+            新規登録
+          </button>
+        </nav>
+
+        <div role="tabpanel">
+          {activeTab === "login" ? <LoginForm /> : <RegisterForm />}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
