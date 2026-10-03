@@ -112,6 +112,8 @@ openssl rand -hex 32      # → collector API キー
 
 1. [dash.cloudflare.com](https://dash.cloudflare.com) でサインアップする（クレジットカード不要）
 2. **Workers & Pages → Create → Pages → Import an existing Git repository** を選び、GitHub の `shunta-hara/oshikatsu` を連携する
+   - Create を押すと、最初に **Workers** の作成画面が出る。必ず **Pages** を選び直すこと。設定画面に「Deploy command（`npx wrangler deploy`）」の欄があれば、それは Workers の画面
+   - 誤って Workers で作ってしまった場合は、そのプロジェクトを削除してから Pages で作り直す
 3. 設定を入力する
 
    | 項目 | 値 |
@@ -173,6 +175,7 @@ openssl rand -hex 32      # → collector API キー
 
 | 症状 | 主な原因 | 対処 |
 |---|---|---|
+| Cloudflare のビルドが `Could not read package.json` で失敗する | Root directory が `/` のまま。または Pages ではなく Workers で作成している | Pages で作り直し、Root directory を `frontend` にする（手順 5） |
 | frontend で通信エラー。ブラウザのコンソールに CORS エラー | `CORS_ALLOWED_ORIGINS` と frontend の URL が一致していない | `https://` から始まる完全な URL を、末尾の `/` なしで設定する |
 | 通信先の URL が `//api/v1` になっている | `VITE_API_BASE_URL` の末尾に `/` がある | `/` を消して Cloudflare で再デプロイする |
 | Render のデプロイがすぐに失敗する | 必須の環境変数が欠けているか、名前を間違えている | ログのメッセージに出ている環境変数名を確認する（`__` は2つ） |
