@@ -1,0 +1,4 @@
+**/bin/
+**/obj/
+OshikatsuApi.Tests/
+**/appsettings.Development.json

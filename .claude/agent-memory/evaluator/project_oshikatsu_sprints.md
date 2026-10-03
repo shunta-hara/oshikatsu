@@ -5,11 +5,23 @@ metadata:
   type: project
 ---
 
-Sprint 19まで完了。FEAT-020（frontendのAPIベースURL環境変数化・SPAルーティング）実装済み。
+Sprint 20 評価完了（合格）。FEAT-021（backendコンテナ化・CORS・HTTPS・マイグレーション自動適用）の全必須観点が合格。
 
 **Why:** FEAT-001〜022をカバーするために21スプリントが計画・実施された。
 
 **How to apply:** 新規スプリント開始時はこのプロジェクトの現在状態を参照する。
+
+## Sprint 20 評価 (2026-10-03) - 2回目: 合格
+
+- 対象: FEAT-021（backendコンテナ化・CORS・HTTPS・マイグレーション自動適用）
+- 結果: **合格**
+- ビルド/テスト: backend 287/287 全合格
+- 修正確認:
+  1. PORT 未設定時の UseUrls 無条件呼び出し修正: Program.cs L20-24 `if (!string.IsNullOrEmpty(port))` で条件分岐 ✅
+     - 動的確認: `dotnet run --urls :5000` で :5000 LISTEN + health 200 確認
+  2. ForwardedHeaders KnownNetworks/KnownProxies クリア: Program.cs L188-189 ✅
+     - コードレビュー確認 + Docker PORT=9000 動作確認
+- 後片付け: 全テストコンテナ停止・ポート5000/8080/9000 非リッスン確認
 
 ## Sprint 19 評価 (2026-10-03)
 

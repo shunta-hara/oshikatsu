@@ -15,5 +15,22 @@ services:
       timeout: 3s
       retries: 5
 
+  # backend コンテナの動作確認用（docker compose up backend で起動）
+  # postgres は docker network 内で "postgres" という名前で解決される
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=oshikatsu;Username=oshikatsu;Password=oshikatsu_dev;SSL Mode=Disable"
+      JwtSettings__SecretKey: "oshikatsu_dev_jwt_secret_key_2026_must_be_at_least_256_bits_long_ok"
+      CollectorSettings__ApiKey: "oshikatsu_dev_collector_api_key"
+      CORS_ALLOWED_ORIGINS: "http://localhost:5173"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

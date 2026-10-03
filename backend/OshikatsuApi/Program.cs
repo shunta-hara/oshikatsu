@@ -1,15 +1,31 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using OshikatsuApi.Authentication;
 using OshikatsuApi.Data;
+using OshikatsuApi.Infrastructure;
 using OshikatsuApi.Services;
 using OshikatsuApi.Settings;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// ── PORT 環境変数（Render がリッスンポートを指定する）─────────────────────────
+// PORT が設定されているときだけ UseUrls を呼ぶ。
+// 未設定のときは何もしないことで、--urls フラグや ASPNETCORE_URLS などの
+// 既存の開発フローを壊さない。
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrEmpty(port))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+
+// ── 起動時バリデーション ──────────────────────────────────────────────────────
+// 必須設定が欠けていれば分かりやすいエラーで早期終了する（fast-fail）。
+StartupValidator.ValidateRequiredConfiguration(builder.Configuration);
 
 // ── サービス登録 ──────────────────────────────────────────────────────────────
 
@@ -142,16 +158,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 
-// CORS（開発時: Vite dev server からのアクセスを許可）
+// CORS:
+//   環境変数 CORS_ALLOWED_ORIGINS（カンマ区切り）を優先する。
+//   未設定の場合は appsettings の Cors:AllowedOrigins → 開発用 localhost:5173 の順。
 const string FrontendCorsPolicy = "FrontendCorsPolicy";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(FrontendCorsPolicy, policy =>
     {
-        var allowedOrigins = builder.Configuration
-            .GetSection("Cors:AllowedOrigins")
-            .Get<string[]>() ?? ["http://localhost:5173"];
-
+        var allowedOrigins = CorsOriginResolver.Resolve(builder.Configuration);
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod();
@@ -162,6 +177,18 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// リバースプロキシ（Render）からの X-Forwarded-For / X-Forwarded-Proto を信頼する。
+// KnownNetworks/KnownProxies をクリアすることで、Render のプロキシ IP（ループバック以外）
+// からのヘッダーも信頼される。UseHttpsRedirection は除去済み（Render が TLS を終端するため
+// 不要かつ無限リダイレクトの原因になる）。
+var forwardedOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+};
+forwardedOptions.KnownIPNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -169,11 +196,34 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = "swagger";
 });
 
-app.UseHttpsRedirection();
 app.UseCors(FrontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
+// ── マイグレーション自動適用 ──────────────────────────────────────────────────
+// コンテナ起動時に未適用のマイグレーションを自動で適用する。
+// InMemory プロバイダー（テスト用）では実行しない。
+using (var scope = app.Services.CreateScope())
+{
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (db.Database.ProviderName != "Microsoft.EntityFrameworkCore.InMemory")
+    {
+        try
+        {
+            logger.LogInformation("データベースマイグレーションを適用しています...");
+            db.Database.Migrate();
+            logger.LogInformation("データベースマイグレーションの適用が完了しました。");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "データベースマイグレーションの適用に失敗しました。");
+            throw;
+        }
+    }
+}
 
 app.Run();
 
