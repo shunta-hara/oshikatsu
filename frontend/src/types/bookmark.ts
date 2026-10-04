@@ -13,6 +13,8 @@ export const bookmarkResponseSchema = z.object({
   isPublishedAtEstimated: z.boolean(),
   collectedAt: z.string().datetime({ offset: true }),
   bookmarkedAt: z.string().datetime({ offset: true }),
+  /** 媒体名（FEAT-036）。タイトル末尾から取り出した値またはnull */
+  sourceName: z.string().nullable(),
 });
 
 export type BookmarkResponse = z.infer<typeof bookmarkResponseSchema>;

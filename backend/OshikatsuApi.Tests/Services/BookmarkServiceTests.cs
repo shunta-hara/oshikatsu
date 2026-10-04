@@ -362,6 +362,47 @@ public class BookmarkServiceTests : IDisposable
         Assert.Empty(result.Items);
     }
 
+    // ── GetBookmarksAsync: SourceName (FEAT-036) ────────────────────────────
+
+    [Fact]
+    public async Task GetBookmarksAsync_SourceNameSavedInDb_ReturnsSavedSourceName()
+    {
+        // DB に sourceName が保存されているアイテムはそのまま返す
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news = await CreateNewsItemForOshi(oshi1, "テストニュース - スポニチ", sourceName: "スポニチ Sponichi Annex");
+        await _sut.AddBookmarkAsync(userId, news.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20);
+
+        Assert.Equal("スポニチ Sponichi Annex", result.Items[0].SourceName);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_NoSourceNameInDb_ExtractsFromTitle()
+    {
+        // DB に sourceName がない場合、タイトル末尾の ` - 媒体名` から取り出す
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news = await CreateNewsItemForOshi(oshi1, "テストニュース - Daily Sports", sourceName: null);
+        await _sut.AddBookmarkAsync(userId, news.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20);
+
+        Assert.Equal("Daily Sports", result.Items[0].SourceName);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_NoSourceNameAndNoDashInTitle_ReturnsNullSourceName()
+    {
+        // タイトルに ` - 媒体名` がない場合は null
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news = await CreateNewsItemForOshi(oshi1, "ダッシュなしのタイトル", sourceName: null);
+        await _sut.AddBookmarkAsync(userId, news.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20);
+
+        Assert.Null(result.Items[0].SourceName);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private async Task<NewsItem> CreateNewsItem(string title = "テストニュース")
@@ -427,7 +468,8 @@ public class BookmarkServiceTests : IDisposable
     private async Task<NewsItem> CreateNewsItemForOshi(
         Oshi oshi,
         string title,
-        DateTimeOffset? publishedAt = null)
+        DateTimeOffset? publishedAt = null,
+        string? sourceName = null)
     {
         var now = DateTimeOffset.UtcNow;
         var item = new NewsItem
@@ -437,6 +479,7 @@ public class BookmarkServiceTests : IDisposable
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = now,
             PublishedAt = publishedAt,
+            SourceName = sourceName,
             CreatedAt = now,
         };
         _db.NewsItems.Add(item);

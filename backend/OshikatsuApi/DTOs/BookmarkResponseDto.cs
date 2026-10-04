@@ -20,4 +20,7 @@ public class BookmarkResponseDto
 
     /// <summary>ブックマーク登録日時（UTC）</summary>
     public DateTimeOffset BookmarkedAt { get; set; }
+
+    /// <summary>媒体名（FEAT-036）。DB に保存されていない場合はタイトル末尾から取り出す。</summary>
+    public string? SourceName { get; set; }
 }

@@ -45,6 +45,7 @@ const sampleItem = {
   isPublishedAtEstimated: false,
   collectedAt: "2026-08-30T10:00:00+09:00",
   bookmarkedAt: "2026-08-30T12:00:00+09:00",
+  sourceName: null,
 };
 
 function renderPage() {
@@ -326,6 +327,47 @@ describe("BookmarkPage", () => {
         screen.getByText("条件に一致するブックマークがありません"),
       ).toBeInTheDocument();
     });
+  });
+
+  // ── 媒体名の表示（FEAT-036, Sprint 34）─────────────────────────────────
+
+  it("sourceName があるとき feed-card__source-name で表示される", async () => {
+    mockGetBookmarks.mockResolvedValue(
+      makeBookmarkPage({
+        items: [{ ...sampleItem, sourceName: "スポニチ Sponichi Annex" }],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText("スポニチ Sponichi Annex")).toBeInTheDocument();
+    });
+  });
+
+  it("sourceName が null のとき媒体名欄が表示されない", async () => {
+    mockGetBookmarks.mockResolvedValue(
+      makeBookmarkPage({
+        items: [{ ...sampleItem, sourceName: null }],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    renderPage();
+
+    await waitFor(() => {
+      // タイトルは表示されている
+      expect(
+        screen.getByText("ブックマークされたニュース"),
+      ).toBeInTheDocument();
+    });
+
+    // 媒体名 span は存在しない
+    const card = screen.getByRole("article");
+    expect(card.querySelector(".feed-card__source-name")).toBeNull();
   });
 
   // ── 掲載日の表示（FEAT-031）────────────────────────────────────────────

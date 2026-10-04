@@ -142,6 +142,10 @@ public class BookmarkService : IBookmarkService
             IsPublishedAtEstimated = b.NewsItem.IsPublishedAtEstimated,
             CollectedAt = b.NewsItem.CollectedAt,
             BookmarkedAt = b.CreatedAt,
+            // Sprint 34 (FEAT-036): 媒体名。DB に保存済みの値を優先し、ない場合はタイトル末尾から取り出す
+            SourceName = !string.IsNullOrEmpty(b.NewsItem.SourceName)
+                ? b.NewsItem.SourceName
+                : ArticleDeduplicator.ExtractSourceNameFromTitle(b.NewsItem.Title),
         }).ToList();
 
         return new PaginatedResponseDto<BookmarkResponseDto>

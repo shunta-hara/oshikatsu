@@ -176,8 +176,10 @@ export function BookmarkPage() {
                         掲載日: {displayDate(item)}
                       </time>
                     </div>
-                    {item.summary && (
-                      <p className="feed-card__summary">{item.summary}</p>
+                    {item.sourceName && (
+                      <span className="feed-card__source-name">
+                        {item.sourceName}
+                      </span>
                     )}
                     <div className="feed-card__actions">
                       <BookmarkButton
