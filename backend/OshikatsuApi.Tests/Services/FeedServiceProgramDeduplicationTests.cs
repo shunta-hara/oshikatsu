@@ -43,16 +43,39 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
 
         var oshi = new Oshi { UserId = user.Id, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
         _db.Oshis.Add(oshi);
+
+        // FEAT-039: Talent + UserOshi も作成して talent_id ベースのクエリが機能するようにする
+        var talent = new Talent
+        {
+            DisplayName = "テスト推し",
+            NormalizedName = TalentNameNormalizer.Normalize("テスト推し"),
+            CreatedAt = dbNow,
+        };
+        _db.Talents.Add(talent);
         await _db.SaveChangesAsync();
 
+        _db.UserOshis.Add(new UserOshi { UserId = user.Id, TalentId = talent.Id, CreatedAt = dbNow });
+        await _db.SaveChangesAsync();
+
+        // oshi に talentId を記録しておく（AddNewsItemAsync / AddProgramAsync で使うため）
+        oshi.Name = "テスト推し"; // 既設
         return (user, oshi);
+    }
+
+    // SetupUserAndOshiAsync で作成した talent_id を取得する
+    private async Task<int> GetTalentId()
+    {
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == TalentNameNormalizer.Normalize("テスト推し"));
+        return talent.Id;
     }
 
     private async Task AddNewsItemAsync(int oshiId, string sourceUrl, string title = "ニュース")
     {
+        var talentId = await GetTalentId();
         _db.NewsItems.Add(new NewsItem
         {
             OshiId = oshiId,
+            TalentId = talentId,
             Title = title,
             SourceUrl = sourceUrl,
             PublishedAt = _now,
@@ -65,10 +88,12 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
 
     private async Task AddProgramAsync(int oshiId, string sourceUrl, string? name = null)
     {
+        var talentId = await GetTalentId();
         // デフォルト名は sourceUrl を含めて一意にする（FEAT-035 の転載重複まとめが誤動作しないよう）
         _db.ProgramAppearances.Add(new ProgramAppearance
         {
             OshiId = oshiId,
+            TalentId = talentId,
             ProgramName = name ?? $"番組_{sourceUrl}",
             Broadcaster = "テストTV",
             AiredAt = _now,

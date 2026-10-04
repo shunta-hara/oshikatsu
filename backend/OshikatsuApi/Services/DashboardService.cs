@@ -17,24 +17,28 @@ public class DashboardService : IDashboardService
     /// <inheritdoc />
     public async Task<IReadOnlyList<OshiDashboardCardDto>> GetSummaryAsync(int userId)
     {
-        // クエリ 1: ユーザーの推し一覧を登録順で取得
-        var oshis = await _db.Oshis
+        // FEAT-039: user_oshis テーブルからユーザーの推し一覧を登録順で取得する
+        var userOshis = await _db.UserOshis
             .Where(o => o.UserId == userId)
+            .Include(o => o.Talent)
             .OrderBy(o => o.CreatedAt)
             .ToListAsync();
 
-        if (oshis.Count == 0)
+        if (userOshis.Count == 0)
         {
             return [];
         }
 
-        var oshiIds = oshis.Select(o => o.Id).ToList();
+        var talentIds = userOshis.Select(o => o.TalentId).ToList();
+        var talentIdToUserOshiId = userOshis.ToDictionary(o => o.TalentId, o => o.Id);
+        var talentIdToName = userOshis.ToDictionary(o => o.TalentId, o => o.Talent.DisplayName);
 
         // クエリ 2: 全推しのニュースを PublishedAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
         // FEAT-029: PublishedAt 降順、同一のとき ID 降順で並べる
         // FEAT-030: 画像箱を除外する
+        // FEAT-039: talent_id ベースで絞り込む
         var newsItems = await _db.NewsItems
-            .Where(n => oshiIds.Contains(n.OshiId))
+            .Where(n => n.TalentId != null && talentIds.Contains(n.TalentId!.Value))
             .OrderByDescending(n => n.PublishedAt)
             .ThenByDescending(n => n.Id)
             .ToListAsync();
@@ -44,18 +48,20 @@ public class DashboardService : IDashboardService
             .Where(n => !GalleryTitleDetector.IsGalleryTitle(n.Title))
             .ToList();
         var newsGroups = ArticleDeduplicator.GroupNewsItems(filteredNewsItems);
-        // 代表の推しIDごとに最新（最初）のグループを取得
-        var latestNewsGroupByOshiId = newsGroups
-            .GroupBy(g => g.Representative.OshiId)
+        // 代表のタレントIDごとに最新（最初）のグループを取得
+        var latestNewsGroupByTalentId = newsGroups
+            .Where(g => g.Representative.TalentId.HasValue)
+            .GroupBy(g => g.Representative.TalentId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
 
         // クエリ 3: 全推しの出演番組を AiredAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
-        // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外
+        // FEAT-024: 同タレントのニュースと sourceUrl が重複する番組を除外
         // FEAT-029: AiredAt 降順、同一のとき ID 降順で並べる
         // FEAT-030: 画像箱を除外する
+        // FEAT-039: talent_id ベースで絞り込む
         var programItems = await _db.ProgramAppearances
-            .Where(p => oshiIds.Contains(p.OshiId))
-            .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl))
+            .Where(p => p.TalentId != null && talentIds.Contains(p.TalentId!.Value))
+            .Where(p => !_db.NewsItems.Any(n => n.TalentId == p.TalentId && n.SourceUrl == p.SourceUrl))
             .OrderByDescending(p => p.AiredAt)
             .ThenByDescending(p => p.Id)
             .ToListAsync();
@@ -65,16 +71,18 @@ public class DashboardService : IDashboardService
             .Where(p => !GalleryTitleDetector.IsGalleryTitle(p.ProgramName))
             .ToList();
         var programGroups = ArticleDeduplicator.GroupProgramItems(filteredProgramItems);
-        var latestProgramGroupByOshiId = programGroups
-            .GroupBy(g => g.Representative.OshiId)
+        var latestProgramGroupByTalentId = programGroups
+            .Where(g => g.Representative.TalentId.HasValue)
+            .GroupBy(g => g.Representative.TalentId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
 
         // 3 クエリ合計（N+1 なし）でカードを組み立てて返す
-        return oshis.Select(o => new OshiDashboardCardDto
+        // FEAT-039: OshiId = user_oshis.id（user_oshi_id）
+        return userOshis.Select(o => new OshiDashboardCardDto
         {
             OshiId = o.Id,
-            OshiName = o.Name,
-            LatestNews = latestNewsGroupByOshiId.TryGetValue(o.Id, out var newsGroup)
+            OshiName = o.Talent.DisplayName,
+            LatestNews = latestNewsGroupByTalentId.TryGetValue(o.TalentId, out var newsGroup)
                 ? new NewsItemSummaryDto
                 {
                     Id = newsGroup.Representative.Id,
@@ -85,7 +93,7 @@ public class DashboardService : IDashboardService
                         ? newsGroup.Representative.SourceName
                         : ArticleDeduplicator.ExtractSourceNameFromTitle(newsGroup.Representative.Title),
                     OtherSourceCount = newsGroup.Others.Count,
-                    OtherSources = newsGroup.Others.Select(ot => new OshikatsuApi.DTOs.OtherSourceDto
+                    OtherSources = newsGroup.Others.Select(ot => new OtherSourceDto
                     {
                         SourceName = !string.IsNullOrEmpty(ot.SourceName)
                             ? ot.SourceName
@@ -94,7 +102,7 @@ public class DashboardService : IDashboardService
                     }).ToList(),
                 }
                 : null,
-            LatestProgram = latestProgramGroupByOshiId.TryGetValue(o.Id, out var programGroup)
+            LatestProgram = latestProgramGroupByTalentId.TryGetValue(o.TalentId, out var programGroup)
                 ? new ProgramAppearanceSummaryDto
                 {
                     Id = programGroup.Representative.Id,
@@ -106,7 +114,7 @@ public class DashboardService : IDashboardService
                         ? programGroup.Representative.SourceName
                         : ArticleDeduplicator.ExtractSourceNameFromTitle(programGroup.Representative.ProgramName),
                     OtherSourceCount = programGroup.Others.Count,
-                    OtherSources = programGroup.Others.Select(ot => new OshikatsuApi.DTOs.OtherSourceDto
+                    OtherSources = programGroup.Others.Select(ot => new OtherSourceDto
                     {
                         SourceName = !string.IsNullOrEmpty(ot.SourceName)
                             ? ot.SourceName

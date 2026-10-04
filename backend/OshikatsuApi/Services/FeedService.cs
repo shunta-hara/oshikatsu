@@ -20,16 +20,21 @@ public class FeedService : IFeedService
         int? oshiId = null, string? query = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
-        // ユーザーの推し ID 一覧を取得（サブクエリよりも InMemory・SQL 両対応しやすい）
-        var oshiIds = await _db.Oshis
+        // FEAT-039: user_oshis テーブルからユーザーのタレント一覧を取得する
+        var userOshisData = await _db.UserOshis
             .Where(o => o.UserId == userId)
-            .Select(o => o.Id)
+            .Include(o => o.Talent)
             .ToListAsync();
 
-        // oshiId フィルタが指定された場合、ユーザーの推しに含まれるか検証して絞り込む
+        var talentIdToUserOshiId = userOshisData.ToDictionary(o => o.TalentId, o => o.Id);
+        var talentIdToName = userOshisData.ToDictionary(o => o.TalentId, o => o.Talent.DisplayName);
+        var talentIds = userOshisData.Select(o => o.TalentId).ToList();
+
+        // oshiId フィルタが指定された場合、user_oshi_id → talent_id に解決して絞り込む
         if (oshiId.HasValue)
         {
-            if (!oshiIds.Contains(oshiId.Value))
+            var targetUserOshi = userOshisData.FirstOrDefault(o => o.Id == oshiId.Value);
+            if (targetUserOshi is null)
             {
                 return new PaginatedResponseDto<NewsItemResponseDto>
                 {
@@ -39,10 +44,11 @@ public class FeedService : IFeedService
                     PageSize = pageSize,
                 };
             }
-            oshiIds = [oshiId.Value];
+            talentIds = [targetUserOshi.TalentId];
         }
 
-        var newsQuery = _db.NewsItems.Where(n => oshiIds.Contains(n.OshiId));
+        // talent_id でニュースを絞り込む（FEAT-039）
+        var newsQuery = _db.NewsItems.Where(n => n.TalentId != null && talentIds.Contains(n.TalentId!.Value));
 
         // キーワード検索: タイトルまたは本文要約に対して大文字小文字を区別しない部分一致で絞り込む。
         // ToLower().Contains() を使うことで、PostgreSQL（Npgsql が lower()+strpos に変換）と
@@ -92,11 +98,6 @@ public class FeedService : IFeedService
             .Take(pageSize)
             .ToList();
 
-        // 推し名を付与するために Oshi を一括ロード
-        var oshiNameMap = await _db.Oshis
-            .Where(o => oshiIds.Contains(o.Id))
-            .ToDictionaryAsync(o => o.Id, o => o.Name);
-
         // ブックマーク済みIDセットを取得（現在ページのグループ内の全アイテム ID を対象）
         var allGroupItemIds = pageGroups
             .SelectMany(g => g.Others.Select(o => o.Id).Prepend(g.Representative.Id))
@@ -116,11 +117,18 @@ public class FeedService : IFeedService
             // グループ内のいずれかがブックマーク済みなら代表をブックマーク済みとする
             var isBookmarked = g.Others.Any(o => bookmarkedIds.Contains(o.Id))
                 || bookmarkedIds.Contains(n.Id);
+            // FEAT-039: OshiId は user_oshi_id（talent_id 経由で解決）
+            var userOshiId = n.TalentId.HasValue
+                ? talentIdToUserOshiId.GetValueOrDefault(n.TalentId.Value)
+                : 0;
+            var oshiName = n.TalentId.HasValue
+                ? talentIdToName.GetValueOrDefault(n.TalentId.Value, string.Empty)
+                : string.Empty;
             return new NewsItemResponseDto
             {
                 Id = n.Id,
-                OshiId = n.OshiId,
-                OshiName = oshiNameMap.GetValueOrDefault(n.OshiId) ?? string.Empty,
+                OshiId = userOshiId,
+                OshiName = oshiName,
                 Title = n.Title,
                 Summary = n.Summary,
                 SourceUrl = n.SourceUrl,
@@ -155,15 +163,21 @@ public class FeedService : IFeedService
         int? oshiId = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
-        var oshiIds = await _db.Oshis
+        // FEAT-039: user_oshis テーブルからユーザーのタレント一覧を取得する
+        var userOshisData = await _db.UserOshis
             .Where(o => o.UserId == userId)
-            .Select(o => o.Id)
+            .Include(o => o.Talent)
             .ToListAsync();
 
-        // oshiId フィルタが指定された場合、ユーザーの推しに含まれるか検証して絞り込む
+        var talentIdToUserOshiId = userOshisData.ToDictionary(o => o.TalentId, o => o.Id);
+        var talentIdToName = userOshisData.ToDictionary(o => o.TalentId, o => o.Talent.DisplayName);
+        var talentIds = userOshisData.Select(o => o.TalentId).ToList();
+
+        // oshiId フィルタが指定された場合、user_oshi_id → talent_id に解決して絞り込む
         if (oshiId.HasValue)
         {
-            if (!oshiIds.Contains(oshiId.Value))
+            var targetUserOshi = userOshisData.FirstOrDefault(o => o.Id == oshiId.Value);
+            if (targetUserOshi is null)
             {
                 return new PaginatedResponseDto<ProgramAppearanceResponseDto>
                 {
@@ -173,14 +187,16 @@ public class FeedService : IFeedService
                     PageSize = pageSize,
                 };
             }
-            oshiIds = [oshiId.Value];
+            talentIds = [targetUserOshi.TalentId];
         }
 
-        var programsQuery = _db.ProgramAppearances.Where(p => oshiIds.Contains(p.OshiId));
+        // talent_id で番組を絞り込む（FEAT-039）
+        var programsQuery = _db.ProgramAppearances
+            .Where(p => p.TalentId != null && talentIds.Contains(p.TalentId!.Value));
 
-        // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外（DBからは削除しない）
+        // FEAT-024: 同タレントのニュースと sourceUrl が重複する番組を除外（DBからは削除しない）
         programsQuery = programsQuery
-            .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl));
+            .Where(p => !_db.NewsItems.Any(n => n.TalentId == p.TalentId && n.SourceUrl == p.SourceUrl));
 
         // 日付範囲フィルタ: 放送日時（AiredAt）で絞り込む。
         // AiredAt が null のアイテムはフィルタ適用時に除外される。
@@ -217,21 +233,24 @@ public class FeedService : IFeedService
             .Take(pageSize)
             .ToList();
 
-        var oshiNameMap = await _db.Oshis
-            .Where(o => oshiIds.Contains(o.Id))
-            .ToDictionaryAsync(o => o.Id, o => o.Name);
-
         var items = pageGroups.Select(g =>
         {
             var p = g.Representative;
             var sourceName = !string.IsNullOrEmpty(p.SourceName)
                 ? p.SourceName
                 : ArticleDeduplicator.ExtractSourceNameFromTitle(p.ProgramName);
+            // FEAT-039: OshiId は user_oshi_id（talent_id 経由で解決）
+            var userOshiId = p.TalentId.HasValue
+                ? talentIdToUserOshiId.GetValueOrDefault(p.TalentId.Value)
+                : 0;
+            var oshiName = p.TalentId.HasValue
+                ? talentIdToName.GetValueOrDefault(p.TalentId.Value, string.Empty)
+                : string.Empty;
             return new ProgramAppearanceResponseDto
             {
                 Id = p.Id,
-                OshiId = p.OshiId,
-                OshiName = oshiNameMap.GetValueOrDefault(p.OshiId) ?? string.Empty,
+                OshiId = userOshiId,
+                OshiName = oshiName,
                 ProgramName = p.ProgramName,
                 Broadcaster = p.Broadcaster,
                 AiredAt = p.AiredAt,
@@ -271,22 +290,23 @@ public class FeedService : IFeedService
 
         var lastViewed = user.LastViewedFeedAt.Value;
 
-        var oshiIds = await _db.Oshis
+        // FEAT-039: talent_id ベースで未読カウント
+        var talentIds = await _db.UserOshis
             .Where(o => o.UserId == userId)
-            .Select(o => o.Id)
+            .Select(o => o.TalentId)
             .ToListAsync();
 
-        if (oshiIds.Count == 0)
+        if (talentIds.Count == 0)
         {
             return 0;
         }
 
         var newsCount = await _db.NewsItems
-            .Where(n => oshiIds.Contains(n.OshiId) && n.CollectedAt > lastViewed)
+            .Where(n => n.TalentId != null && talentIds.Contains(n.TalentId!.Value) && n.CollectedAt > lastViewed)
             .CountAsync();
 
         var programCount = await _db.ProgramAppearances
-            .Where(p => oshiIds.Contains(p.OshiId) && p.CollectedAt > lastViewed)
+            .Where(p => p.TalentId != null && talentIds.Contains(p.TalentId!.Value) && p.CollectedAt > lastViewed)
             .CountAsync();
 
         return newsCount + programCount;

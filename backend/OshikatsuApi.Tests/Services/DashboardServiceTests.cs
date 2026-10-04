@@ -43,7 +43,7 @@ public class DashboardServiceTests : IDisposable
         var result = await _sut.GetSummaryAsync(userId: 1);
 
         Assert.Single(result);
-        Assert.Equal(oshi.Id, result[0].OshiId);
+        Assert.Equal(await GetUserOshiId(oshi), result[0].OshiId);
         Assert.Equal("テスト推し", result[0].OshiName);
     }
 
@@ -57,9 +57,9 @@ public class DashboardServiceTests : IDisposable
 
         var result = await _sut.GetSummaryAsync(userId: 1);
 
-        Assert.Equal(oshi1.Id, result[0].OshiId);
-        Assert.Equal(oshi2.Id, result[1].OshiId);
-        Assert.Equal(oshi3.Id, result[2].OshiId);
+        Assert.Equal(await GetUserOshiId(oshi1), result[0].OshiId);
+        Assert.Equal(await GetUserOshiId(oshi2), result[1].OshiId);
+        Assert.Equal(await GetUserOshiId(oshi3), result[2].OshiId);
     }
 
     // FEAT-029: 最新ニュースは PublishedAt が最も新しいものを返す
@@ -162,8 +162,10 @@ public class DashboardServiceTests : IDisposable
 
         var result = await _sut.GetSummaryAsync(userId: 1);
 
-        var cardA = result.First(c => c.OshiId == oshi1.Id);
-        var cardB = result.First(c => c.OshiId == oshi2.Id);
+        var userOshiId1 = await GetUserOshiId(oshi1);
+        var userOshiId2 = await GetUserOshiId(oshi2);
+        var cardA = result.First(c => c.OshiId == userOshiId1);
+        var cardB = result.First(c => c.OshiId == userOshiId2);
 
         Assert.Equal("推しAのニュース", cardA.LatestNews!.Title);
         Assert.Equal("推しBのニュース", cardB.LatestNews!.Title);
@@ -267,8 +269,54 @@ public class DashboardServiceTests : IDisposable
             UpdatedAt = now,
         };
         _db.Oshis.Add(oshi);
+
+        // FEAT-039: UserOshi + Talent も同時に作成して talent_id ベースのクエリが機能するようにする
+        var normalizedName = TalentNameNormalizer.Normalize(name);
+        var existingTalent = _db.Talents.Local.FirstOrDefault(t => t.NormalizedName == normalizedName)
+            ?? await _db.Talents.FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
+        if (existingTalent is null)
+        {
+            existingTalent = new Talent
+            {
+                DisplayName = name,
+                NormalizedName = normalizedName,
+                CreatedAt = now,
+            };
+            _db.Talents.Add(existingTalent);
+        }
         await _db.SaveChangesAsync();
+
+        var existingUserOshi = await _db.UserOshis
+            .FirstOrDefaultAsync(o => o.UserId == userId && o.TalentId == existingTalent.Id);
+        if (existingUserOshi is null)
+        {
+            _db.UserOshis.Add(new UserOshi
+            {
+                UserId = userId,
+                TalentId = existingTalent.Id,
+                CreatedAt = now,
+            });
+            await _db.SaveChangesAsync();
+        }
+
         return oshi;
+    }
+
+    // Oshi から user_oshis.id を取得するヘルパー（DashboardService は user_oshi_id を返す）
+    private async Task<int> GetUserOshiId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        var userOshi = await _db.UserOshis.FirstAsync(o => o.UserId == oshi.UserId && o.TalentId == talent.Id);
+        return userOshi.Id;
+    }
+
+    // Oshi から TalentId を取得するヘルパー
+    private async Task<int> GetTalentId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        return talent.Id;
     }
 
     private async Task<NewsItem> CreateNewsItem(
@@ -279,9 +327,11 @@ public class DashboardServiceTests : IDisposable
         DateTimeOffset? publishedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new NewsItem
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             Title = title,
             SourceUrl = sourceUrl ?? $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
@@ -302,9 +352,11 @@ public class DashboardServiceTests : IDisposable
         DateTimeOffset? airedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new ProgramAppearance
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             ProgramName = programName,
             Broadcaster = broadcaster,
             SourceUrl = sourceUrl ?? $"https://example.com/programs/{Guid.NewGuid()}",

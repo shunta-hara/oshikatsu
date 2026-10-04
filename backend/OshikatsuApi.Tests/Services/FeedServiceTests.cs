@@ -237,7 +237,7 @@ public class FeedServiceTests : IDisposable
         await CreateNewsItem(oshi1, "推しAのニュース");
         await CreateNewsItem(oshi2, "推しBのニュース");
 
-        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: oshi1.Id);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: await GetUserOshiId(oshi1));
 
         Assert.Equal(1, result.TotalCount);
         Assert.Single(result.Items);
@@ -251,7 +251,7 @@ public class FeedServiceTests : IDisposable
         await CreateNewsItem(otherOshi, "他ユーザーのニュース");
 
         // userId=1 のユーザーが userId=99 の oshiId でフィルタしても空になる
-        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: otherOshi.Id);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: await GetUserOshiId(otherOshi));
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -280,7 +280,7 @@ public class FeedServiceTests : IDisposable
         await CreateProgramAppearance(oshi1, "推しAの番組");
         await CreateProgramAppearance(oshi2, "推しBの番組");
 
-        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, oshiId: oshi2.Id);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, oshiId: await GetUserOshiId(oshi2));
 
         Assert.Equal(1, result.TotalCount);
         Assert.Single(result.Items);
@@ -293,7 +293,7 @@ public class FeedServiceTests : IDisposable
         var otherOshi = await CreateOshi(userId: 99, name: "他ユーザーの推し");
         await CreateProgramAppearance(otherOshi, "他ユーザーの番組");
 
-        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, oshiId: otherOshi.Id);
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20, oshiId: await GetUserOshiId(otherOshi));
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -555,10 +555,11 @@ public class FeedServiceTests : IDisposable
         await CreateNewsItem(oshi2, "Pythonニュース");
 
         // oshi1 + "Python" キーワードで絞り込むと oshi1 の1件のみ
-        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: oshi1.Id, query: "Python");
+        var userOshi1Id = await GetUserOshiId(oshi1);
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, oshiId: userOshi1Id, query: "Python");
 
         Assert.Equal(1, result.TotalCount);
-        Assert.Equal(oshi1.Id, result.Items[0].OshiId);
+        Assert.Equal(userOshi1Id, result.Items[0].OshiId);
     }
 
     // ── GetNewsAsync: 日付範囲フィルタ ──────────────────────────────────────
@@ -871,9 +872,9 @@ public class FeedServiceTests : IDisposable
         return user;
     }
 
-    private async Task<Oshi> CreateOshi(int userId, string name)
+    private async Task<Oshi> CreateOshi(int userId, string name, DateTime? createdAt = null)
     {
-        var now = DateTime.UtcNow;
+        var now = createdAt ?? DateTime.UtcNow;
         var oshi = new Oshi
         {
             UserId = userId,
@@ -882,8 +883,54 @@ public class FeedServiceTests : IDisposable
             UpdatedAt = now,
         };
         _db.Oshis.Add(oshi);
+
+        // FEAT-039: UserOshi + Talent も同時に作成して talent_id ベースのフィルタが機能するようにする
+        var normalizedName = TalentNameNormalizer.Normalize(name);
+        var existingTalent = _db.Talents.Local.FirstOrDefault(t => t.NormalizedName == normalizedName)
+            ?? await _db.Talents.FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
+        if (existingTalent is null)
+        {
+            existingTalent = new Talent
+            {
+                DisplayName = name,
+                NormalizedName = normalizedName,
+                CreatedAt = now,
+            };
+            _db.Talents.Add(existingTalent);
+        }
         await _db.SaveChangesAsync();
+
+        var existingUserOshi = await _db.UserOshis
+            .FirstOrDefaultAsync(o => o.UserId == userId && o.TalentId == existingTalent.Id);
+        if (existingUserOshi is null)
+        {
+            _db.UserOshis.Add(new UserOshi
+            {
+                UserId = userId,
+                TalentId = existingTalent.Id,
+                CreatedAt = now,
+            });
+            await _db.SaveChangesAsync();
+        }
+
         return oshi;
+    }
+
+    // Oshi から TalentId を取得するヘルパー
+    private async Task<int> GetTalentId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        return talent.Id;
+    }
+
+    // Oshi から user_oshis.id を取得するヘルパー（FEAT-039: oshiId フィルタは user_oshis.id）
+    private async Task<int> GetUserOshiId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        var userOshi = await _db.UserOshis.FirstAsync(o => o.UserId == oshi.UserId && o.TalentId == talent.Id);
+        return userOshi.Id;
     }
 
     private async Task<NewsItem> CreateNewsItem(
@@ -894,9 +941,11 @@ public class FeedServiceTests : IDisposable
         DateTimeOffset? publishedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new NewsItem
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             Title = title,
             Summary = summary,
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
@@ -916,9 +965,11 @@ public class FeedServiceTests : IDisposable
         DateTimeOffset? airedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new ProgramAppearance
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             ProgramName = programName,
             SourceUrl = $"https://example.com/programs/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,

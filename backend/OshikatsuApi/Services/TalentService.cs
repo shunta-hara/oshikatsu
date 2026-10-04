@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OshikatsuApi.Data;
 using OshikatsuApi.Entities;
 
@@ -35,7 +36,28 @@ public class TalentService : ITalentService
             CreatedAt = DateTime.UtcNow,
         };
         _db.Talents.Add(talent);
-        await _db.SaveChangesAsync();
-        return talent;
+
+        try
+        {
+            await _db.SaveChangesAsync();
+            return talent;
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            // 並行 INSERT でユニーク制約違反が発生した場合は既存レコードを再 SELECT して返す
+            _db.Entry(talent).State = EntityState.Detached;
+            var raceWinner = await _db.Talents
+                .FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
+            return raceWinner
+                ?? throw new InvalidOperationException(
+                    $"Talent with normalized_name '{normalizedName}' not found after UNIQUE constraint violation.");
+        }
     }
+
+    /// <summary>
+    /// DB 更新例外がユニーク制約違反（PostgreSQL エラーコード 23505）かどうかを判定する。
+    /// InMemory プロバイダーでは PostgresException が発生しないため false を返す。
+    /// </summary>
+    protected virtual bool IsUniqueConstraintViolation(DbUpdateException ex)
+        => ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505";
 }

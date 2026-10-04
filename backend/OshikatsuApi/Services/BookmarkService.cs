@@ -65,16 +65,22 @@ public class BookmarkService : IBookmarkService
         int? oshiId = null, string? query = null,
         DateTimeOffset? from = null, DateTimeOffset? to = null)
     {
+        // FEAT-039: user_oshis テーブルからユーザーのタレント一覧を取得する
         // 他ユーザーの推し ID を指定しても他人のデータは返さない
-        // まず自分の推し ID 一覧を取得し、oshiId 指定がある場合は自分の推しに含まれるか検証する
+        var userOshisData = await _db.UserOshis
+            .Where(o => o.UserId == userId)
+            .Include(o => o.Talent)
+            .ToListAsync();
+
+        var talentIdToUserOshiId = userOshisData.ToDictionary(o => o.TalentId, o => o.Id);
+        var talentIdToName = userOshisData.ToDictionary(o => o.TalentId, o => o.Talent.DisplayName);
+
+        // oshiId フィルタが指定された場合、user_oshi_id → talent_id に解決する
+        int? talentIdFilter = null;
         if (oshiId.HasValue)
         {
-            var ownOshiIds = await _db.Oshis
-                .Where(o => o.UserId == userId)
-                .Select(o => o.Id)
-                .ToListAsync();
-
-            if (!ownOshiIds.Contains(oshiId.Value))
+            var targetUserOshi = userOshisData.FirstOrDefault(o => o.Id == oshiId.Value);
+            if (targetUserOshi is null)
             {
                 return new PaginatedResponseDto<BookmarkResponseDto>
                 {
@@ -84,18 +90,19 @@ public class BookmarkService : IBookmarkService
                     PageSize = pageSize,
                 };
             }
+            talentIdFilter = targetUserOshi.TalentId;
         }
 
         var bookmarkQuery = _db.Bookmarks
             .Where(b => b.UserId == userId)
             .Include(b => b.NewsItem)
-            .ThenInclude(n => n.Oshi)
+            .ThenInclude(n => n.Talent)
             .AsQueryable();
 
-        // 推し ID フィルタ
-        if (oshiId.HasValue)
+        // 推し ID フィルタ（talent_id 経由）
+        if (talentIdFilter.HasValue)
         {
-            bookmarkQuery = bookmarkQuery.Where(b => b.NewsItem.OshiId == oshiId.Value);
+            bookmarkQuery = bookmarkQuery.Where(b => b.NewsItem.TalentId == talentIdFilter.Value);
         }
 
         // キーワード検索（FEAT-031）: タイトルまたは要約に対して大文字小文字を区別しない部分一致
@@ -129,23 +136,36 @@ public class BookmarkService : IBookmarkService
             .Take(pageSize)
             .ToListAsync();
 
-        var items = rawItems.Select(b => new BookmarkResponseDto
+        var items = rawItems.Select(b =>
         {
-            Id = b.Id,
-            NewsItemId = b.NewsItemId,
-            OshiId = b.NewsItem.OshiId,
-            OshiName = b.NewsItem.Oshi.Name,
-            Title = b.NewsItem.Title,
-            Summary = b.NewsItem.Summary,
-            SourceUrl = b.NewsItem.SourceUrl,
-            PublishedAt = b.NewsItem.PublishedAt,
-            IsPublishedAtEstimated = b.NewsItem.IsPublishedAtEstimated,
-            CollectedAt = b.NewsItem.CollectedAt,
-            BookmarkedAt = b.CreatedAt,
-            // Sprint 34 (FEAT-036): 媒体名。DB に保存済みの値を優先し、ない場合はタイトル末尾から取り出す
-            SourceName = !string.IsNullOrEmpty(b.NewsItem.SourceName)
-                ? b.NewsItem.SourceName
-                : ArticleDeduplicator.ExtractSourceNameFromTitle(b.NewsItem.Title),
+            var newsItem = b.NewsItem;
+            // FEAT-039: OshiId は user_oshi_id（talent_id 経由で解決）
+            var userOshiId = newsItem.TalentId.HasValue
+                ? talentIdToUserOshiId.GetValueOrDefault(newsItem.TalentId.Value)
+                : 0;
+            var oshiName = newsItem.TalentId.HasValue && newsItem.Talent is not null
+                ? newsItem.Talent.DisplayName
+                : (newsItem.TalentId.HasValue
+                    ? talentIdToName.GetValueOrDefault(newsItem.TalentId.Value, string.Empty)
+                    : string.Empty);
+            return new BookmarkResponseDto
+            {
+                Id = b.Id,
+                NewsItemId = b.NewsItemId,
+                OshiId = userOshiId,
+                OshiName = oshiName,
+                Title = newsItem.Title,
+                Summary = newsItem.Summary,
+                SourceUrl = newsItem.SourceUrl,
+                PublishedAt = newsItem.PublishedAt,
+                IsPublishedAtEstimated = newsItem.IsPublishedAtEstimated,
+                CollectedAt = newsItem.CollectedAt,
+                BookmarkedAt = b.CreatedAt,
+                // Sprint 34 (FEAT-036): 媒体名。DB に保存済みの値を優先し、ない場合はタイトル末尾から取り出す
+                SourceName = !string.IsNullOrEmpty(newsItem.SourceName)
+                    ? newsItem.SourceName
+                    : ArticleDeduplicator.ExtractSourceNameFromTitle(newsItem.Title),
+            };
         }).ToList();
 
         return new PaginatedResponseDto<BookmarkResponseDto>
