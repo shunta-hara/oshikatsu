@@ -425,6 +425,140 @@
   - [ ] frontend のニュース・出演情報カードで、概要テキストの代わりに媒体名が小さく表示される
   - [ ] 媒体名が取り出せなかったアイテムはカードに媒体名の欄が表示されない（空白行が出ない）
 
+### FEAT-037: タレントテーブル・DBマイグレーションと既存データ移行
+- **優先度**: Must
+- **説明**: 現在の `oshis` テーブルを「タレント（共通の名簿）」と「ユーザーの推し登録」に分割する。`talents` テーブルと `user_oshis` テーブルを新設し、`news_items`・`program_appearances` の参照先をタレントに切り替える。本番環境の既存データ（推し2件）はマイグレーションスクリプトで移行し、同一タレント内のソースURL重複は1件に統合する。
+- **受け入れ基準**:
+  - [ ] `talents` テーブルが存在する（id, display_name, normalized_name（ユニーク制約）, created_at）
+  - [ ] `user_oshis` テーブルが存在する（id, user_id FK→users, talent_id FK→talents, created_at; user_id+talent_id にユニーク制約）
+  - [ ] `news_items` に `talent_id` 列（FK→talents）が追加されている
+  - [ ] `program_appearances` に `talent_id` 列（FK→talents）が追加されている
+  - [ ] 既存の `oshis` レコードがそれぞれ `talents` 1件 + `user_oshis` 1件に変換されている
+  - [ ] 既存の `news_items`・`program_appearances` の `talent_id` が移行後に正しく設定されている
+  - [ ] 移行後、同一 `talent_id` 内で `source_url` が重複するアイテムは最古の1件のみ残り、余剰は削除されている
+  - [ ] `dotnet ef database update` で適用できる
+  - [ ] `dotnet test backend` が正常にパスする
+
+### FEAT-038: タレント名正規化・同一タレント判定ロジック
+- **優先度**: Must
+- **説明**: 同じ人物の異なる表記（スペースあり・なし、全角英字など）を同一タレントとみなすための正規化関数を backend のコード1か所で定義する。正規化済みの名前を `normalized_name` として保存し、推し登録時の重複検索に利用する。2人目以降のユーザーが異なる表記で登録しても `display_name`（最初に登録した表記）は変わらない。
+- **受け入れ基準**:
+  - [ ] 正規化関数が backend のコードの1か所で定義されている（変更・テストが容易）
+  - [ ] 正規化の手順: Unicode NFKC 正規化 → 英字を小文字に変換 → 空白（半角・全角すべて）を完全除去
+  - [ ] 「津田 健次郎」「津田　健次郎」（全角スペース）「津田健次郎」が同一の `normalized_name` になる
+  - [ ] 全角英字・全角数字を含む名前が正しく半角変換される（例:「ＬＯＶＥ」→「love」）
+  - [ ] 推し登録時に入力名を正規化し、同じ `normalized_name` を持つ `talents` が存在すれば再利用する
+  - [ ] 同じ `normalized_name` の `talents` が存在しない場合のみ新規 `talents` レコードを作成し、`display_name` に入力値をそのまま保持する
+  - [ ] 2人目以降が異なる表記で同名タレントを登録しても `display_name` は最初の登録表記のまま変わらない
+  - [ ] xUnit テストで代表的な正規化パターン（全角スペース、半角スペース、全角英数字、全角記号）が期待どおりに処理されることを確認できる
+
+### FEAT-039: 推し登録・管理 Public API のタレントモデル対応
+- **優先度**: Must
+- **説明**: Public API（`/api/v1/oshis` とそれを参照する全エンドポイント）をタレントモデルに対応させる。外部から見える `id` は引き続き `user_oshis.id` を使い、frontend とブックマークへの影響を最小にする。推しを削除してもタレントおよび収集済みの記事・番組は残る。FEAT-026 の GitHub Actions dispatch の inputs も `talent_id` に変更する。
+- **受け入れ基準**:
+  - [ ] `POST /api/v1/oshis` の成功時、レスポンスの `id` は `user_oshis.id`、`name` は `talents.display_name` を返す
+  - [ ] 同一ユーザーが同一 `normalized_name` を再登録しようとした場合に 409 を返す
+  - [ ] 異なるユーザーが同一 `normalized_name` を登録した場合は成功する（同じ `talent` を参照する別 `user_oshi` を作成）
+  - [ ] `GET /api/v1/oshis` の各アイテムの `id` は `user_oshis.id`、`name` は `talents.display_name`
+  - [ ] `DELETE /api/v1/oshis/{id}` は `user_oshis` レコードのみ削除し、`talents`・`news_items`・`program_appearances` は削除しない
+  - [ ] `GET /api/v1/news?oshiId={user_oshi_id}` は `user_oshi_id` → `talent_id` を解決してニュースを返す
+  - [ ] `GET /api/v1/programs?oshiId={user_oshi_id}` は同様に解決して返す
+  - [ ] `GET /api/v1/bookmarks?oshiId={user_oshi_id}` は同様に解決して返す
+  - [ ] ダッシュボードの推しカードは `user_oshis.id` を外部キーとして扱い、内部では `talent_id` でニュース・番組を集計する
+  - [ ] FEAT-026 の GitHub Actions dispatch の inputs に `talent_id`（`user_oshi` 経由で解決した `talents.id`）を設定する（`oshi_id` から変更）
+  - [ ] Swagger の `oshis` 関連エンドポイント定義が更新されている
+  - [ ] `dotnet test backend` が正常にパスする
+
+### FEAT-040: 収集向け内部 API のタレントベース化
+- **優先度**: Must
+- **説明**: collector が呼ぶ内部 API をタレント中心に切り替える。oshis 取得 API はユーザー横断で重複なくタレント一覧を返すように変更し、一括登録 API は `oshiId` を `talentId` に置き換える。これにより同一タレントの収集は1回で完結し、ユーザー数が増えても収集回数はタレント数に比例する。
+- **受け入れ基準**:
+  - [ ] `GET /api/v1/internal/oshis` が `[{"talentId": number, "name": string}]` を返す
+  - [ ] 1人以上のユーザーに登録されている talent のみを返す（誰にも登録されていない talent は除外）
+  - [ ] `POST /api/v1/internal/news/batch` のリクエストが `{"talentId": number, "items": [...]}` を受け付ける（`oshiId` フィールドは廃止）
+  - [ ] `POST /api/v1/internal/programs/batch` も同様に `talentId` を受け付ける
+  - [ ] `POST /api/v1/internal/news`（単件）も `talentId` に切り替わっている
+  - [ ] `POST /api/v1/internal/programs`（単件）も同様
+  - [ ] 存在しない `talentId` は 404 を返す
+  - [ ] Swagger の内部 API 定義が更新されている（`talentId` フィールドが反映）
+  - [ ] `dotnet test backend` が正常にパスする
+
+### FEAT-041: collector の収集ターゲットをタレントベースに変更
+- **優先度**: Must
+- **説明**: collector が `GET /api/v1/internal/oshis` から取得したタレントリストを基に収集し、`talentId` を使って一括登録 API に送信するよう変更する。環境変数 `OSHI_ID` を `TALENT_ID` にリネームし、GitHub Actions の手動実行 input も `talent_id` に変更する。これにより収集回数がタレント数で決まり、複数ユーザーが同じ推しを登録していても二重収集が発生しなくなる。
+- **受け入れ基準**:
+  - [ ] collector が `GET /api/v1/internal/oshis` から `talentId` と `name` のリストを取得して収集する
+  - [ ] 一括登録 API 呼び出し時のリクエストに `talentId` を使う（`oshiId` は使わない）
+  - [ ] 環境変数 `TALENT_ID` で特定のタレントのみ収集できる（`OSHI_ID` から変更）
+  - [ ] `TALENT_ID` に数字でない値が設定された場合はエラーで終了する
+  - [ ] `TALENT_ID` に存在しない ID が設定された場合は警告ログを出して正常終了する
+  - [ ] `.github/workflows/collect.yml` の `workflow_dispatch` 入力が `oshi_id` から `talent_id` に変更されている
+  - [ ] `workflow_dispatch` 実行時に `talent_id` 入力値が `TALENT_ID` として collector に渡される
+  - [ ] `pytest collector` が正常にパスする
+
+### FEAT-042: frontend の推し登録・フィード表示への調整
+- **優先度**: Must
+- **説明**: Public API の形状は変わらないため frontend の主要コードは変更不要だが、新しい挙動（同名タレントを他ユーザーが登録済みでも自ユーザーの登録は成功する、逆に同一ユーザーの重複登録は409エラー）を正しく扱い、表示名の変化（canonical name の反映）と既存の Vitest テストのパスを確認する。
+- **受け入れ基準**:
+  - [ ] `POST /api/v1/oshis` でレスポンスされた `name`（canonical 表示名）がそのまま推し一覧に表示される
+  - [ ] 同一ユーザーが同名タレントを再登録しようとした場合に 409 エラーメッセージが表示される
+  - [ ] 異なるユーザーが既に同名タレントを登録済みでも自ユーザーの登録は成功する
+  - [ ] `DELETE /api/v1/oshis/{id}` 後、ダッシュボードからその推しのカードと記事が消える（収集済みデータはDB上に残るが表示対象外になる）
+  - [ ] `GET /api/v1/news?oshiId={user_oshi_id}` によるフィルタが引き続き正しく動作する
+  - [ ] 既存の Vitest テストが引き続きパスする（API モックのレスポンス形状の更新のみ可）
+
+---
+
+## タレントモデル導入 — 層間 API 契約
+
+この節の契約を前提として Sprint 37〜40 の並列実装が可能。
+
+### 内部 API（collector ↔ backend）変更後の形状
+
+| エンドポイント | 変更点 | リクエスト（変更後） | レスポンス |
+|---|---|---|---|
+| `GET /api/v1/internal/oshis` | ユーザー別一覧 → タレント別一覧 | — | `[{"talentId": number, "name": string}]` |
+| `POST /api/v1/internal/news/batch` | `oshiId` → `talentId` | `{"talentId": number, "items": [...]}` | `{"received": n, "saved": n, "skipped": n}` |
+| `POST /api/v1/internal/programs/batch` | 同上 | `{"talentId": number, "items": [...]}` | 同上 |
+| `POST /api/v1/internal/news`（単件） | 同上 | `{"talentId": number, "title": string, ...}` | 変更なし |
+| `POST /api/v1/internal/programs`（単件） | 同上 | `{"talentId": number, "title": string, ...}` | 変更なし |
+
+`items` 各要素の構造（変更なし）: `title`, `description`, `sourceUrl`, `publishedAt`（ISO 8601 with offset）, `sourceName`（任意）。
+
+### GitHub Actions / collector 環境変数 変更後
+
+| 変更前 | 変更後 | 用途 |
+|---|---|---|
+| workflow_dispatch input: `oshi_id` | workflow_dispatch input: `talent_id` | 特定タレントの即時収集 |
+| 環境変数: `OSHI_ID` | 環境変数: `TALENT_ID` | collector に渡す収集対象 |
+| backend dispatch inputs フィールド: `oshi_id` | backend dispatch inputs フィールド: `talent_id` | FEAT-026 の workflow_dispatch トリガー |
+
+### 公開 API（frontend ↔ backend）— 形状変更なし
+
+形状は変わらない。各 ID の意味のみ変わる（内部実装の変更）:
+
+- `POST /api/v1/oshis` リクエスト: `{"name": string}` → レスポンス: `{"id": user_oshi_id, "name": talent.display_name, ...}`
+- `GET /api/v1/oshis` → `[{"id": user_oshi_id, "name": talent.display_name, ...}]`
+- `DELETE /api/v1/oshis/{id}` の `id` は `user_oshis.id`（従来と同一）
+- `GET /api/v1/news?oshiId=X`・`GET /api/v1/programs?oshiId=X`・`GET /api/v1/bookmarks?oshiId=X` の `X` は `user_oshis.id`（従来と同一）
+
+---
+
+## タレントモデル導入 — 機能依存関係
+
+| 機能 | 依存する機能 | 並列実行できる機能 |
+|---|---|---|
+| FEAT-037（DBマイグレーション） | なし | — |
+| FEAT-038（正規化ロジック） | FEAT-037 | — |
+| FEAT-039（Public API） | FEAT-037, FEAT-038 | FEAT-040 と並列可 |
+| FEAT-040（内部 API） | FEAT-037, FEAT-038 | FEAT-039 と並列可 |
+| FEAT-041（collector） | FEAT-040 | FEAT-042 と並列可 |
+| FEAT-042（frontend） | FEAT-039 | FEAT-041 と並列可 |
+
+並列実行が有効なフェーズ:
+- **フェーズ A**（Sprint 37 と Sprint 38 を同時起動）: FEAT-038 完了後に FEAT-039（Public API）と FEAT-040（内部 API）の generator を同時起動できる
+- **フェーズ B**（Sprint 39 と Sprint 40 を同時起動）: フェーズ A 完了後に FEAT-041（collector）と FEAT-042（frontend）の generator を同時起動できる
+
 ---
 
 ## スプリント計画
@@ -823,6 +957,80 @@
   - [ ] ブックマーク一覧はまとめない（FEAT-035 のまま）
   - [ ] `dotnet test backend` と frontend の Vitest がパスする（FEAT-036）
 
+### Sprint 35: タレントテーブル新設・既存データのマイグレーション
+- **対象機能**: FEAT-037
+- **主体層**: backend（DBスキーマ・マイグレーション）
+- **完了条件**:
+  - [ ] `talents`・`user_oshis` テーブルが存在し、`news_items`・`program_appearances` に `talent_id` が追加されている（FEAT-037）
+  - [ ] `dotnet ef database update` で適用できる（FEAT-037）
+  - [ ] 既存 `oshis` レコードが `talents` + `user_oshis` に変換されている（FEAT-037）
+  - [ ] 同一 `talent_id` 内のソースURL重複アイテムが統合されている（FEAT-037）
+  - [ ] `dotnet test backend` が正常にパスする（FEAT-037）
+
+### Sprint 36: タレント名正規化・同一タレント判定ロジックの実装
+- **対象機能**: FEAT-038
+- **主体層**: backend（ビジネスロジック）
+- **前提**: Sprint 35 が完了していること
+- **完了条件**:
+  - [ ] NFKC → 小文字 → 空白除去の正規化関数が backend のコード1か所で定義されている（FEAT-038）
+  - [ ] 「津田 健次郎」「津田　健次郎」「津田健次郎」が同一 `normalized_name` になる（FEAT-038）
+  - [ ] 全角英数字を含む名前が正しく正規化される（FEAT-038）
+  - [ ] 推し登録時に同一 `normalized_name` の talent を再利用する/なければ新規作成するロジックが動作する（FEAT-038）
+  - [ ] xUnit テストで正規化パターンが確認できる（FEAT-038）
+  - [ ] `dotnet test backend` が正常にパスする（FEAT-038）
+
+### Sprint 37: 推し登録・管理 Public API のタレントモデル対応
+- **対象機能**: FEAT-039
+- **主体層**: backend（Public API）
+- **前提**: Sprint 36 が完了していること
+- **並列実行**: Sprint 38 と同時起動可
+- **完了条件**:
+  - [ ] `POST /api/v1/oshis` が `user_oshis.id` を返し、同一ユーザー重複で 409、他ユーザー同名では成功する（FEAT-039）
+  - [ ] `GET /api/v1/oshis` が `user_oshis.id` / `talents.display_name` を返す（FEAT-039）
+  - [ ] `DELETE /api/v1/oshis/{id}` が `user_oshis` のみ削除し、talent・記事・番組は残る（FEAT-039）
+  - [ ] `GET /api/v1/news?oshiId=X` / `GET /api/v1/programs?oshiId=X` / `GET /api/v1/bookmarks?oshiId=X` が `user_oshi_id` → `talent_id` を解決して動作する（FEAT-039）
+  - [ ] FEAT-026 の dispatch inputs が `talent_id` に変更されている（FEAT-039）
+  - [ ] Swagger が更新されている（FEAT-039）
+  - [ ] `dotnet test backend` が正常にパスする（FEAT-039）
+
+### Sprint 38: 収集向け内部 API のタレントベース化
+- **対象機能**: FEAT-040
+- **主体層**: backend（内部 API）
+- **前提**: Sprint 36 が完了していること
+- **並列実行**: Sprint 37 と同時起動可
+- **完了条件**:
+  - [ ] `GET /api/v1/internal/oshis` が `[{"talentId": number, "name": string}]` を返す（1人以上登録のタレントのみ）（FEAT-040）
+  - [ ] 一括登録 API（ニュース・番組）が `talentId` フィールドを受け付ける（`oshiId` は廃止）（FEAT-040）
+  - [ ] 単件登録 API（ニュース・番組）も `talentId` に切り替わっている（FEAT-040）
+  - [ ] 存在しない `talentId` に 404 を返す（FEAT-040）
+  - [ ] Swagger の内部 API 定義が更新されている（FEAT-040）
+  - [ ] `dotnet test backend` が正常にパスする（FEAT-040）
+
+### Sprint 39: collector の収集ターゲットをタレントベースに変更
+- **対象機能**: FEAT-041
+- **主体層**: collector
+- **前提**: Sprint 38 が完了していること
+- **並列実行**: Sprint 40 と同時起動可
+- **完了条件**:
+  - [ ] collector が `GET /api/v1/internal/oshis` から `talentId` ベースのリストを取得して収集する（FEAT-041）
+  - [ ] 一括登録 API 呼び出しに `talentId` を使う（FEAT-041）
+  - [ ] 環境変数 `TALENT_ID` で特定タレントのみ収集できる（FEAT-041）
+  - [ ] `TALENT_ID` が数字でない場合はエラー終了、存在しない ID の場合は警告ログで正常終了する（FEAT-041）
+  - [ ] `.github/workflows/collect.yml` の `workflow_dispatch` 入力が `talent_id` に変更されている（FEAT-041）
+  - [ ] `pytest collector` が正常にパスする（FEAT-041）
+
+### Sprint 40: frontend の推し登録・フィード表示への調整
+- **対象機能**: FEAT-042
+- **主体層**: frontend
+- **前提**: Sprint 37 が完了していること
+- **並列実行**: Sprint 39 と同時起動可
+- **完了条件**:
+  - [ ] `POST /api/v1/oshis` のレスポンス `name`（canonical 表示名）が一覧に表示される（FEAT-042）
+  - [ ] 同一ユーザーの重複登録で 409 エラーメッセージが表示される（FEAT-042）
+  - [ ] `DELETE /api/v1/oshis/{id}` 後、ダッシュボードからその推しカードが消える（FEAT-042）
+  - [ ] `GET /api/v1/news?oshiId=X` によるフィルタが引き続き正しく動作する（FEAT-042）
+  - [ ] 既存の Vitest テストが引き続きパスする（FEAT-042）
+
 ---
 
 ## UXフロー
@@ -852,6 +1060,13 @@
 4. 「ログアウト」リンクでログアウトしてログイン画面へ戻る
 5. ブックマーク一覧から「ダッシュボード」リンクで一覧に戻れる（専用の「戻る」ボタン不要）
 
+### タレント共有フロー（FEAT-037〜042）
+1. ユーザー A が「津田健次郎」を推しとして登録する（タレントが新規作成され、ユーザー A の推し登録が作成される）
+2. ユーザー B が「津田 健次郎」（スペースあり）を推しとして登録する（同一タレントと判定され、タレント新規作成はせずユーザー B の推し登録のみ作成される。表示名は「津田健次郎」で統一される）
+3. 次の収集サイクルで「津田健次郎」は1回だけ収集され、ユーザー A とユーザー B の両方のフィードに同じ記事が表示される
+4. ユーザー A が「津田健次郎」を削除しても、ユーザー B のフィードは変わらない（タレントは1人以上の登録者がいるため収集も継続される）
+5. ユーザー B も削除すると、「津田健次郎」タレントは誰にも登録されていない状態となり、次回以降の収集対象から外れる（タレントレコードおよびすべての記事・番組は DB に残る）
+
 ---
 
 ## 非機能要件
@@ -864,3 +1079,4 @@
 - **日時の正規化**: backend はオフセット付きの DateTimeOffset をすべて UTC に変換してから DB に書き込む。frontend は日付入力を JST (UTC+09:00) の日境界として API に渡す
 - **デプロイ可用性**: 接続文字列・JWT秘密鍵・APIキー・CORS設定はすべて環境変数から読み、環境変数だけを差し替えることで開発・本番を切り替えられる。Docker イメージはローカルでビルド・起動を検証できる
 - **コールドスタート対応**: Render のスリープ復帰（約1分）に備え、collector は収集前にヘルスチェックで backend の起動を確認してから収集を開始する
+- **タレントデータの共有とスケーラビリティ**: 複数ユーザーが同一タレントを登録した場合、収集データはタレント単位で共有される。収集回数はタレント数に比例し、ユーザー数が増えても収集コストは増加しない。各ユーザーの推し登録の有無は他ユーザーに公開しない

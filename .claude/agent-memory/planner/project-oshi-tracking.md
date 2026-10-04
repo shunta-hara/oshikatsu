@@ -52,4 +52,26 @@ docs/spec-oshi-tracking.md に仕様書を生成・追記済み。
 - 重複まとめ: タイトル正規化は backend 1か所で管理（FEAT-030 の画像箱判定と同じ考え方）。転載先媒体名リスト（Yahoo!・Infoseek・auWeb・ライブドア・goo・エキサイト・BIGLOBE・dメニュー・LINE NEWS・MSN・ニコニコ）も同1か所
 
 **Why:** 2026-10-04 本番運用で、フィードが古い順・画像箱ノイズ・ブックマーク絞り込み不足・ニュースと出演情報が混在・定期収集の信頼性問題が確認された。同日さらに転載重複（同一記事が元媒体・転載先で重複表示）と description の &nbsp; 不具合が確認された。
-**How to apply:** 次に仕様追記を依頼されたら FEAT-037〜、Sprint 34〜 から採番する。
+2026-10-05 追記内容（FEAT-037〜042）:
+- FEAT-037（Sprint 35）: タレントテーブル新設・既存データ移行 / backend DB / Must
+- FEAT-038（Sprint 36）: タレント名正規化（NFKC→小文字→空白除去）・同一判定ロジック / backend ロジック / Must
+- FEAT-039（Sprint 37）: 推し登録 Public API のタレントモデル対応（`/api/v1/oshis` 形状は不変、id=user_oshis.id のまま）/ backend Public API / Must
+- FEAT-040（Sprint 38）: 収集向け内部 API のタレントベース化（`oshiId`→`talentId`）/ backend 内部 API / Must
+- FEAT-041（Sprint 39）: collector 収集ターゲット切り替え（`OSHI_ID`→`TALENT_ID`、workflow input `oshi_id`→`talent_id`）/ collector / Must
+- FEAT-042（Sprint 40）: frontend の表示名・エラーハンドリング・Vitest テスト確認 / frontend / Must
+
+並列実行フェーズ:
+- フェーズ A: Sprint 36 完了後に Sprint 37（Public API）と Sprint 38（内部 API）を同時起動
+- フェーズ B: フェーズ A 完了後に Sprint 39（collector）と Sprint 40（frontend）を同時起動
+
+外部仕様として確定した項目（タレントモデル導入）:
+- 内部 API: `GET /api/v1/internal/oshis` → `[{talentId, name}]`
+- 内部 API batch リクエスト: `oshiId` → `talentId` に変更
+- 環境変数: `OSHI_ID` → `TALENT_ID`
+- workflow_dispatch input: `oshi_id` → `talent_id`
+- dispatch フィールド: `oshi_id` → `talent_id`
+- 正規化ルール: NFKC → 英字小文字化 → 空白除去（半角・全角）
+- display_name は最初に登録した表記を保持
+- 推しを削除しても talent・記事・番組は削除しない
+
+**How to apply:** 次に仕様追記を依頼されたら FEAT-043〜、Sprint 41〜 から採番する。
