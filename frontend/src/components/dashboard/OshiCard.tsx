@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { OshiDashboardCard } from "../../types/dashboard";
+import { OtherSourcesAccordion } from "../feed/OtherSourcesAccordion";
 
 interface OshiCardProps {
   card: OshiDashboardCard;
@@ -31,14 +32,25 @@ export function OshiCard({ card }: OshiCardProps) {
           最新ニュース
         </h4>
         {card.latestNews !== null ? (
-          <a
-            className="oshi-card__content-link"
-            href={card.latestNews.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {card.latestNews.title}
-          </a>
+          <>
+            <a
+              className="oshi-card__content-link"
+              href={card.latestNews.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {card.latestNews.title}
+            </a>
+            {card.latestNews.sourceName && (
+              <span className="oshi-card__source-name">
+                {card.latestNews.sourceName}
+              </span>
+            )}
+            <OtherSourcesAccordion
+              count={card.latestNews.otherSourceCount ?? 0}
+              sources={card.latestNews.otherSources ?? []}
+            />
+          </>
         ) : (
           <p className="oshi-card__none">ニュースなし</p>
         )}
@@ -55,14 +67,25 @@ export function OshiCard({ card }: OshiCardProps) {
           最新出演情報
         </h4>
         {card.latestProgram !== null ? (
-          <a
-            className="oshi-card__content-link"
-            href={card.latestProgram.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {card.latestProgram.programName}
-          </a>
+          <>
+            <a
+              className="oshi-card__content-link"
+              href={card.latestProgram.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {card.latestProgram.programName}
+            </a>
+            {card.latestProgram.sourceName && (
+              <span className="oshi-card__source-name">
+                {card.latestProgram.sourceName}
+              </span>
+            )}
+            <OtherSourcesAccordion
+              count={card.latestProgram.otherSourceCount ?? 0}
+              sources={card.latestProgram.otherSources ?? []}
+            />
+          </>
         ) : (
           <p className="oshi-card__none">出演情報なし</p>
         )}

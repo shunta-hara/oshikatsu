@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { otherSourceSchema } from "./feed";
 
 /** ダッシュボードカード内の軽量ニュースサマリー */
 export const newsItemSummarySchema = z.object({
@@ -6,6 +7,12 @@ export const newsItemSummarySchema = z.object({
   title: z.string(),
   sourceUrl: z.string().url(),
   collectedAt: z.string().datetime({ offset: true }),
+  /** 媒体名（FEAT-036） */
+  sourceName: z.string().nullable().optional(),
+  /** まとめた他媒体の件数（FEAT-035） */
+  otherSourceCount: z.number().int().optional(),
+  /** まとめた他媒体のリンク一覧（FEAT-035） */
+  otherSources: z.array(otherSourceSchema).optional(),
 });
 export type NewsItemSummary = z.infer<typeof newsItemSummarySchema>;
 
@@ -16,6 +23,12 @@ export const programAppearanceSummarySchema = z.object({
   broadcaster: z.string().nullable(),
   sourceUrl: z.string().url(),
   collectedAt: z.string().datetime({ offset: true }),
+  /** 媒体名（FEAT-036） */
+  sourceName: z.string().nullable().optional(),
+  /** まとめた他媒体の件数（FEAT-035） */
+  otherSourceCount: z.number().int().optional(),
+  /** まとめた他媒体のリンク一覧（FEAT-035） */
+  otherSources: z.array(otherSourceSchema).optional(),
 });
 export type ProgramAppearanceSummary = z.infer<
   typeof programAppearanceSummarySchema

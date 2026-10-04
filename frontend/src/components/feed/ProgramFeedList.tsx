@@ -7,6 +7,7 @@ import type {
 } from "../../types/feed";
 import { FeedPagination } from "./FeedPagination";
 import { DateRangeFilter } from "./DateRangeFilter";
+import { OtherSourcesAccordion } from "./OtherSourcesAccordion";
 
 interface ProgramFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しの出演情報を表示する */
@@ -125,6 +126,15 @@ export function ProgramFeedList({
                       掲載日: {displayDate(item)}
                     </time>
                   </div>
+                  {item.sourceName && (
+                    <span className="feed-card__source-name">
+                      {item.sourceName}
+                    </span>
+                  )}
+                  <OtherSourcesAccordion
+                    count={item.otherSourceCount ?? 0}
+                    sources={item.otherSources ?? []}
+                  />
                 </article>
               </li>
             ))}

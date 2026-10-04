@@ -513,4 +513,161 @@ describe("NewsFeedList", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // ── 媒体名・他媒体（FEAT-035, FEAT-036） ──────────────────────────────
+
+  it("sourceName があるとき媒体名が表示される", async () => {
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "テストニュース",
+            summary: null,
+            sourceUrl: "https://example.com/news/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: "スポニチ Sponichi Annex",
+            otherSourceCount: 0,
+            otherSources: [],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("スポニチ Sponichi Annex")).toBeInTheDocument();
+    });
+  });
+
+  it("sourceName が null のとき媒体名欄が表示されない", async () => {
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "テストニュース",
+            summary: null,
+            sourceUrl: "https://example.com/news/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: null,
+            otherSourceCount: 0,
+            otherSources: [],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("テストニュース")).toBeInTheDocument();
+    });
+
+    // 媒体名クラスの要素が存在しない
+    expect(
+      document.querySelector(".feed-card__source-name"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("otherSourceCount が 1 以上のとき「ほか N 媒体」ボタンが表示される", async () => {
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "テストニュース",
+            summary: null,
+            sourceUrl: "https://example.com/news/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: "スポニチ",
+            otherSourceCount: 2,
+            otherSources: [
+              {
+                sourceName: "Yahoo!ニュース",
+                sourceUrl: "https://news.yahoo.co.jp/1",
+              },
+              {
+                sourceName: "Infoseek",
+                sourceUrl: "https://news.infoseek.co.jp/1",
+              },
+            ],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /ほか 2 媒体/ }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("「ほか N 媒体」を開くと他媒体リンクが新しいタブで表示される", async () => {
+    const user = userEvent.setup();
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "テストニュース",
+            summary: null,
+            sourceUrl: "https://example.com/news/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: "スポニチ",
+            otherSourceCount: 1,
+            otherSources: [
+              {
+                sourceName: "Yahoo!ニュース",
+                sourceUrl: "https://news.yahoo.co.jp/1",
+              },
+            ],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /ほか 1 媒体/ }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /ほか 1 媒体/ }));
+
+    const link = screen.getByRole("link", { name: "Yahoo!ニュース" });
+    expect(link).toHaveAttribute("href", "https://news.yahoo.co.jp/1");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
 });

@@ -5,9 +5,13 @@ metadata:
   type: project
 ---
 
-Sprint 32 評価：合格（1回目）。FEAT-035（転載重複まとめ backend）・FEAT-036（媒体名表示・文字参照修正）。backend 473/473・collector 194/194。ArticleDeduplicator が転載ロジックと RepostMediaNames を1か所に集約。マイグレーション自動適用確認済み。
+Sprint 33 評価：合格（1回目）。FEAT-035/036 frontend 部分。281/281 テスト・ビルド正常。OtherSourcesAccordion コンポーネント新規追加。ニュース・出演情報・ダッシュボード OshiCard すべてで「ほか N 媒体」ボタン・アコーディオン・媒体名表示確認済み。375px 水平スクロールなし。全スプリント（1〜33）完了。
 
-**How to apply:** Sprint 32 合格。次は Sprint 33（転載重複まとめ・媒体名の frontend 実装 FEAT-035/036 frontend 部分）。
+**How to apply:** 全スプリント完了。
+
+---
+
+Sprint 32 評価：合格（1回目）。FEAT-035（転載重複まとめ backend）・FEAT-036（媒体名表示・文字参照修正）。backend 473/473・collector 194/194。ArticleDeduplicator が転載ロジックと RepostMediaNames を1か所に集約。マイグレーション自動適用確認済み。
 
 ---
 

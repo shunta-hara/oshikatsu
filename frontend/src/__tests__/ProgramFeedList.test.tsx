@@ -319,4 +319,109 @@ describe("ProgramFeedList", () => {
       );
     });
   });
+
+  // ── 媒体名・他媒体（FEAT-035, FEAT-036） ──────────────────────────────
+
+  it("sourceName があるとき媒体名が出演情報カードに表示される", async () => {
+    mockGetPrograms.mockResolvedValue(
+      makeProgramsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            programName: "テスト番組",
+            broadcaster: null,
+            airedAt: null,
+            isAiredAtEstimated: false,
+            sourceUrl: "https://example.com/programs/1",
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: "ステージナタリー",
+            otherSourceCount: 0,
+            otherSources: [],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("ステージナタリー")).toBeInTheDocument();
+    });
+  });
+
+  it("sourceName が null のとき媒体名欄が出演情報カードに表示されない", async () => {
+    mockGetPrograms.mockResolvedValue(
+      makeProgramsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            programName: "番組名のみ",
+            broadcaster: null,
+            airedAt: null,
+            isAiredAtEstimated: false,
+            sourceUrl: "https://example.com/programs/1",
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: null,
+            otherSourceCount: 0,
+            otherSources: [],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("番組名のみ")).toBeInTheDocument();
+    });
+
+    expect(
+      document.querySelector(".feed-card__source-name"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("otherSourceCount が 1 以上のとき出演情報カードに「ほか N 媒体」ボタンが表示される", async () => {
+    mockGetPrograms.mockResolvedValue(
+      makeProgramsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            programName: "テスト番組",
+            broadcaster: null,
+            airedAt: null,
+            isAiredAtEstimated: false,
+            sourceUrl: "https://example.com/programs/1",
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceName: "ステージナタリー",
+            otherSourceCount: 3,
+            otherSources: [
+              { sourceName: "eスタ", sourceUrl: "https://esta.jp/1" },
+              { sourceName: "ORICON", sourceUrl: "https://oricon.co.jp/1" },
+              { sourceName: "モデルプレス", sourceUrl: "https://mdpr.jp/1" },
+            ],
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<ProgramFeedList />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /ほか 3 媒体/ }),
+      ).toBeInTheDocument();
+    });
+  });
 });

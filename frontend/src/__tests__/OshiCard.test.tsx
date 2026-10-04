@@ -152,4 +152,95 @@ describe("OshiCard", () => {
     const link = screen.getByRole("link", { name: "推しB" });
     expect(link).toHaveAttribute("href", "/?oshiId=2");
   });
+
+  // --- 媒体名・他媒体（FEAT-035, FEAT-036） ---
+  it("latestNews に sourceName があるとき媒体名が表示される", () => {
+    const card: OshiDashboardCard = {
+      oshiId: 1,
+      oshiName: "推しA",
+      latestNews: {
+        id: 10,
+        title: "最新ニュース",
+        sourceUrl: "https://example.com/news/1",
+        collectedAt: "2026-08-01T10:00:00+09:00",
+        sourceName: "スポニチ",
+        otherSourceCount: 0,
+        otherSources: [],
+      },
+      latestProgram: null,
+    };
+    renderCard(card);
+    expect(screen.getByText("スポニチ")).toBeInTheDocument();
+  });
+
+  it("latestNews の sourceName が null のとき媒体名が表示されない", () => {
+    const card: OshiDashboardCard = {
+      oshiId: 1,
+      oshiName: "推しA",
+      latestNews: {
+        id: 10,
+        title: "最新ニュース",
+        sourceUrl: "https://example.com/news/1",
+        collectedAt: "2026-08-01T10:00:00+09:00",
+        sourceName: null,
+        otherSourceCount: 0,
+        otherSources: [],
+      },
+      latestProgram: null,
+    };
+    renderCard(card);
+    expect(
+      document.querySelector(".oshi-card__source-name"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("latestNews に otherSourceCount > 0 のとき「ほか N 媒体」ボタンが表示される", () => {
+    const card: OshiDashboardCard = {
+      oshiId: 1,
+      oshiName: "推しA",
+      latestNews: {
+        id: 10,
+        title: "最新ニュース",
+        sourceUrl: "https://example.com/news/1",
+        collectedAt: "2026-08-01T10:00:00+09:00",
+        sourceName: "スポニチ",
+        otherSourceCount: 2,
+        otherSources: [
+          {
+            sourceName: "Yahoo!ニュース",
+            sourceUrl: "https://news.yahoo.co.jp/1",
+          },
+          {
+            sourceName: "Infoseek",
+            sourceUrl: "https://news.infoseek.co.jp/1",
+          },
+        ],
+      },
+      latestProgram: null,
+    };
+    renderCard(card);
+    expect(
+      screen.getByRole("button", { name: /ほか 2 媒体/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("latestProgram に sourceName があるとき媒体名が表示される", () => {
+    const card: OshiDashboardCard = {
+      oshiId: 1,
+      oshiName: "推しA",
+      latestNews: null,
+      latestProgram: {
+        id: 20,
+        programName: "テスト番組",
+        broadcaster: null,
+        sourceUrl: "https://example.com/prog/1",
+        collectedAt: "2026-08-01T09:00:00+09:00",
+        sourceName: "ステージナタリー",
+        otherSourceCount: 0,
+        otherSources: [],
+      },
+    };
+    renderCard(card);
+    expect(screen.getByText("ステージナタリー")).toBeInTheDocument();
+  });
 });

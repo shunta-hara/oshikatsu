@@ -6,6 +6,7 @@ import { FeedPagination } from "./FeedPagination";
 import { NewsSearchBox } from "./NewsSearchBox";
 import { DateRangeFilter } from "./DateRangeFilter";
 import { BookmarkButton } from "./BookmarkButton";
+import { OtherSourcesAccordion } from "./OtherSourcesAccordion";
 
 interface NewsFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しのニュースを表示する */
@@ -145,9 +146,15 @@ export function NewsFeedList({
                       掲載日: {displayDate(item)}
                     </time>
                   </div>
-                  {item.summary && (
-                    <p className="feed-card__summary">{item.summary}</p>
+                  {item.sourceName && (
+                    <span className="feed-card__source-name">
+                      {item.sourceName}
+                    </span>
                   )}
+                  <OtherSourcesAccordion
+                    count={item.otherSourceCount ?? 0}
+                    sources={item.otherSources ?? []}
+                  />
                   <div className="feed-card__actions">
                     <BookmarkButton
                       newsItemId={item.id}

@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+/** 転載・同一記事の他媒体情報（FEAT-035） */
+export const otherSourceSchema = z.object({
+  sourceName: z.string().nullable(),
+  sourceUrl: z.string().url(),
+});
+export type OtherSource = z.infer<typeof otherSourceSchema>;
+
 /** GET /api/v1/news の単一アイテム */
 export const newsItemSchema = z.object({
   id: z.number().int(),
@@ -13,6 +20,12 @@ export const newsItemSchema = z.object({
   collectedAt: z.string().datetime({ offset: true }),
   /** ログインユーザーがこの記事をブックマーク済みかどうか（未取得の場合は undefined）*/
   isBookmarked: z.boolean().optional(),
+  /** 媒体名（FEAT-036）。未取得または取り出せない場合は null/undefined */
+  sourceName: z.string().nullable().optional(),
+  /** まとめた他媒体の件数（FEAT-035） */
+  otherSourceCount: z.number().int().optional(),
+  /** まとめた他媒体のリンク一覧（FEAT-035） */
+  otherSources: z.array(otherSourceSchema).optional(),
 });
 
 export type NewsItem = z.infer<typeof newsItemSchema>;
@@ -28,6 +41,12 @@ export const programAppearanceSchema = z.object({
   isAiredAtEstimated: z.boolean(),
   sourceUrl: z.string().url(),
   collectedAt: z.string().datetime({ offset: true }),
+  /** 媒体名（FEAT-036） */
+  sourceName: z.string().nullable().optional(),
+  /** まとめた他媒体の件数（FEAT-035） */
+  otherSourceCount: z.number().int().optional(),
+  /** まとめた他媒体のリンク一覧（FEAT-035） */
+  otherSources: z.array(otherSourceSchema).optional(),
 });
 
 export type ProgramAppearance = z.infer<typeof programAppearanceSchema>;

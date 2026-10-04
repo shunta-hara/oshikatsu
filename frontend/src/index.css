@@ -836,6 +836,61 @@ textarea:disabled {
   margin: 0 0 var(--space-2);
 }
 
+.feed-card__source-name {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-1);
+}
+
+/* ── 転載記事アコーディオン（FEAT-035） ── */
+
+.other-sources {
+  margin-bottom: var(--space-1);
+}
+
+.other-sources__toggle {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  line-height: 1.4;
+}
+
+.other-sources__toggle:hover {
+  color: var(--color-accent-strong);
+}
+
+.other-sources__arrow {
+  font-size: 8px;
+}
+
+.other-sources__list {
+  list-style: none;
+  margin: var(--space-1) 0 0 0;
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  border-left: 2px solid var(--color-border);
+}
+
+.other-sources__list li + li {
+  margin-top: 2px;
+}
+
+.other-sources__link {
+  font-size: 11px;
+  color: var(--color-accent-strong);
+  text-decoration: none;
+}
+
+.other-sources__link:hover {
+  text-decoration: underline;
+}
+
 .feed-card__actions {
   display: flex;
   justify-content: flex-end;
@@ -903,6 +958,13 @@ textarea:disabled {
 .oshi-card__none {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+.oshi-card__source-name {
+  display: block;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 /* ================================================================
