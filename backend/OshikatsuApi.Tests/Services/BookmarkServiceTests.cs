@@ -222,6 +222,146 @@ public class BookmarkServiceTests : IDisposable
         Assert.Single(page2.Items);
     }
 
+    // ── GetBookmarksAsync: FEAT-031 絞り込みフィルタ ────────────────────────────
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithOshiId_ReturnsOnlyThatOshisBookmarks()
+    {
+        var (userId, oshi1, oshi2) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news1 = await CreateNewsItemForOshi(oshi1, "推しAニュース");
+        var news2 = await CreateNewsItemForOshi(oshi2, "推しBニュース");
+        await _sut.AddBookmarkAsync(userId, news1.Id);
+        await _sut.AddBookmarkAsync(userId, news2.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, oshiId: oshi1.Id);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("推しAニュース", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_OtherUsersOshiId_ReturnsEmpty()
+    {
+        // 他ユーザーの推し ID を指定しても他人のデータは返らない
+        var (userId1, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var (userId2, oshi2, _) = await CreateTwoOshisForUser(targetUserId: 2);
+        var news = await CreateNewsItemForOshi(oshi2, "他ユーザーニュース");
+        await _sut.AddBookmarkAsync(userId2, news.Id);
+
+        // userId=1 が userId=2 の oshi2 で絞り込んでも空
+        var result = await _sut.GetBookmarksAsync(userId1, page: 1, pageSize: 20, oshiId: oshi2.Id);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithKeyword_FiltersTitle()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var newsA = await CreateNewsItemForOshi(oshi1, "Pythonについて");
+        var newsB = await CreateNewsItemForOshi(oshi1, "Javaの情報");
+        await _sut.AddBookmarkAsync(userId, newsA.Id);
+        await _sut.AddBookmarkAsync(userId, newsB.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("Pythonについて", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithKeyword_CaseInsensitive()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news = await CreateNewsItemForOshi(oshi1, "NHK Morning Show");
+        await _sut.AddBookmarkAsync(userId, news.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, query: "nhk");
+
+        Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithFrom_FiltersPublishedAt()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var now = DateTimeOffset.UtcNow;
+        var newsOld = await CreateNewsItemForOshi(oshi1, "古い記事", publishedAt: now.AddDays(-5));
+        var newsNew = await CreateNewsItemForOshi(oshi1, "新しい記事", publishedAt: now.AddDays(-1));
+        await _sut.AddBookmarkAsync(userId, newsOld.Id);
+        await _sut.AddBookmarkAsync(userId, newsNew.Id);
+
+        var from = now.AddDays(-3);
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, from: from);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("新しい記事", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithTo_FiltersPublishedAt()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var now = DateTimeOffset.UtcNow;
+        var newsOld = await CreateNewsItemForOshi(oshi1, "古い記事", publishedAt: now.AddDays(-5));
+        var newsNew = await CreateNewsItemForOshi(oshi1, "新しい記事", publishedAt: now.AddDays(-1));
+        await _sut.AddBookmarkAsync(userId, newsOld.Id);
+        await _sut.AddBookmarkAsync(userId, newsNew.Id);
+
+        var to = now.AddDays(-3);
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, to: to);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("古い記事", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_WithFromAndTo_FiltersRange()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var now = DateTimeOffset.UtcNow;
+        var newsOld = await CreateNewsItemForOshi(oshi1, "範囲外(古)", publishedAt: now.AddDays(-10));
+        var newsIn = await CreateNewsItemForOshi(oshi1, "範囲内", publishedAt: now.AddDays(-5));
+        var newsNew = await CreateNewsItemForOshi(oshi1, "範囲外(新)", publishedAt: now.AddDays(-1));
+        await _sut.AddBookmarkAsync(userId, newsOld.Id);
+        await _sut.AddBookmarkAsync(userId, newsIn.Id);
+        await _sut.AddBookmarkAsync(userId, newsNew.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20,
+            from: now.AddDays(-7), to: now.AddDays(-3));
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("範囲内", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_NoFilters_ReturnAll()
+    {
+        var (userId, oshi1, oshi2) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news1 = await CreateNewsItemForOshi(oshi1, "ニュース1");
+        var news2 = await CreateNewsItemForOshi(oshi2, "ニュース2");
+        await _sut.AddBookmarkAsync(userId, news1.Id);
+        await _sut.AddBookmarkAsync(userId, news2.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20);
+
+        Assert.Equal(2, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetBookmarksAsync_FilterReturnsEmpty_ReturnsEmptyWithZeroCount()
+    {
+        var (userId, oshi1, _) = await CreateTwoOshisForUser(targetUserId: 1);
+        var news = await CreateNewsItemForOshi(oshi1, "Java情報");
+        await _sut.AddBookmarkAsync(userId, news.Id);
+
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, query: "Python");
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private async Task<NewsItem> CreateNewsItem(string title = "テストニュース")
@@ -253,6 +393,50 @@ public class BookmarkServiceTests : IDisposable
             Title = title,
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = now,
+            CreatedAt = now,
+        };
+        _db.NewsItems.Add(item);
+        await _db.SaveChangesAsync();
+        return item;
+    }
+
+    /// <summary>
+    /// テスト用にユーザーと2つの推しを同一ユーザー下に作成する。
+    /// FEAT-031 フィルタテストで推し別絞り込みの検証に使用する。
+    /// </summary>
+    private async Task<(int userId, Oshi oshi1, Oshi oshi2)> CreateTwoOshisForUser(int targetUserId)
+    {
+        var user = new User
+        {
+            Email = $"user{targetUserId}-{Guid.NewGuid()}@example.com",
+            PasswordHash = "hash",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        var oshi1 = new Oshi { UserId = user.Id, Name = "推しA", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        var oshi2 = new Oshi { UserId = user.Id, Name = "推しB", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow };
+        _db.Oshis.AddRange(oshi1, oshi2);
+        await _db.SaveChangesAsync();
+
+        return (user.Id, oshi1, oshi2);
+    }
+
+    private async Task<NewsItem> CreateNewsItemForOshi(
+        Oshi oshi,
+        string title,
+        DateTimeOffset? publishedAt = null)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var item = new NewsItem
+        {
+            OshiId = oshi.Id,
+            Title = title,
+            SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
+            CollectedAt = now,
+            PublishedAt = publishedAt,
             CreatedAt = now,
         };
         _db.NewsItems.Add(item);

@@ -30,25 +30,33 @@ public class DashboardService : IDashboardService
 
         var oshiIds = oshis.Select(o => o.Id).ToList();
 
-        // クエリ 2: 全推しのニュースを収集日時降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
+        // クエリ 2: 全推しのニュースを PublishedAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
+        // FEAT-029: PublishedAt 降順、同一のとき ID 降順で並べる
+        // FEAT-030: 画像箱を除外する
         var newsItems = await _db.NewsItems
             .Where(n => oshiIds.Contains(n.OshiId))
-            .OrderByDescending(n => n.CollectedAt)
+            .OrderByDescending(n => n.PublishedAt)
+            .ThenByDescending(n => n.Id)
             .ToListAsync();
 
         var latestNewsByOshiId = newsItems
+            .Where(n => !GalleryTitleDetector.IsGalleryTitle(n.Title))
             .GroupBy(n => n.OshiId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        // クエリ 3: 全推しの出演番組を収集日時降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
+        // クエリ 3: 全推しの出演番組を AiredAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
         // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外
+        // FEAT-029: AiredAt 降順、同一のとき ID 降順で並べる
+        // FEAT-030: 画像箱を除外する
         var programItems = await _db.ProgramAppearances
             .Where(p => oshiIds.Contains(p.OshiId))
             .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl))
-            .OrderByDescending(p => p.CollectedAt)
+            .OrderByDescending(p => p.AiredAt)
+            .ThenByDescending(p => p.Id)
             .ToListAsync();
 
         var latestProgramByOshiId = programItems
+            .Where(p => !GalleryTitleDetector.IsGalleryTitle(p.ProgramName))
             .GroupBy(p => p.OshiId)
             .ToDictionary(g => g.Key, g => g.First());
 

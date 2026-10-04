@@ -62,14 +62,15 @@ public class DashboardServiceTests : IDisposable
         Assert.Equal(oshi3.Id, result[2].OshiId);
     }
 
+    // FEAT-029: 最新ニュースは PublishedAt が最も新しいものを返す
     [Fact]
-    public async Task GetSummaryAsync_LatestNewsIsTheMostRecentByCollectedAt()
+    public async Task GetSummaryAsync_LatestNewsIsTheMostRecentByPublishedAt()
     {
         var oshi = await CreateOshi(userId: 1, name: "推しA");
         var now = DateTimeOffset.UtcNow;
-        await CreateNewsItem(oshi, "古いニュース", collectedAt: now.AddHours(-2));
-        await CreateNewsItem(oshi, "最新ニュース", collectedAt: now);
-        await CreateNewsItem(oshi, "中間ニュース", collectedAt: now.AddHours(-1));
+        await CreateNewsItem(oshi, "古いニュース", publishedAt: now.AddHours(-2));
+        await CreateNewsItem(oshi, "最新ニュース", publishedAt: now);
+        await CreateNewsItem(oshi, "中間ニュース", publishedAt: now.AddHours(-1));
 
         var result = await _sut.GetSummaryAsync(userId: 1);
 
@@ -91,14 +92,15 @@ public class DashboardServiceTests : IDisposable
         Assert.Equal(now.ToUnixTimeSeconds(), result[0].LatestNews!.CollectedAt.ToUnixTimeSeconds());
     }
 
+    // FEAT-029: 最新出演情報は AiredAt が最も新しいものを返す
     [Fact]
-    public async Task GetSummaryAsync_LatestProgramIsTheMostRecentByCollectedAt()
+    public async Task GetSummaryAsync_LatestProgramIsTheMostRecentByAiredAt()
     {
         var oshi = await CreateOshi(userId: 1, name: "推しA");
         var now = DateTimeOffset.UtcNow;
-        await CreateProgramAppearance(oshi, "古い番組", collectedAt: now.AddHours(-2));
-        await CreateProgramAppearance(oshi, "最新番組", collectedAt: now);
-        await CreateProgramAppearance(oshi, "中間番組", collectedAt: now.AddHours(-1));
+        await CreateProgramAppearance(oshi, "古い番組", airedAt: now.AddHours(-2));
+        await CreateProgramAppearance(oshi, "最新番組", airedAt: now);
+        await CreateProgramAppearance(oshi, "中間番組", airedAt: now.AddHours(-1));
 
         var result = await _sut.GetSummaryAsync(userId: 1);
 
@@ -207,6 +209,51 @@ public class DashboardServiceTests : IDisposable
         Assert.Null(result[0].LatestNews);
     }
 
+    // ── 画像箱フィルタ（FEAT-030）────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetSummaryAsync_GalleryNewsExcluded_LatestNewsIsNonGallery()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        // 画像箱ニュース（最新）と通常ニュース
+        await CreateNewsItem(oshi, "(画像1/5) フォト", publishedAt: now);
+        await CreateNewsItem(oshi, "通常ニュース", publishedAt: now.AddHours(-1));
+
+        var result = await _sut.GetSummaryAsync(userId: 1);
+
+        // 画像箱は除外されて通常ニュースが選ばれる
+        Assert.NotNull(result[0].LatestNews);
+        Assert.Equal("通常ニュース", result[0].LatestNews!.Title);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_OnlyGalleryNews_LatestNewsIsNull()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "写真：推しA 笑顔で登場");
+        await CreateNewsItem(oshi, "(画像2/8) フォトギャラリー");
+
+        var result = await _sut.GetSummaryAsync(userId: 1);
+
+        // 画像箱しかない場合は null
+        Assert.Null(result[0].LatestNews);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_GalleryProgram_LatestProgramIsNonGallery()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateProgramAppearance(oshi, "推しAの写真一覧", airedAt: now);
+        await CreateProgramAppearance(oshi, "出演番組A", airedAt: now.AddHours(-1));
+
+        var result = await _sut.GetSummaryAsync(userId: 1);
+
+        Assert.NotNull(result[0].LatestProgram);
+        Assert.Equal("出演番組A", result[0].LatestProgram!.ProgramName);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private async Task<Oshi> CreateOshi(int userId, string name, DateTime? createdAt = null)
@@ -228,7 +275,8 @@ public class DashboardServiceTests : IDisposable
         Oshi oshi,
         string title,
         string? sourceUrl = null,
-        DateTimeOffset? collectedAt = null)
+        DateTimeOffset? collectedAt = null,
+        DateTimeOffset? publishedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
         var item = new NewsItem
@@ -237,6 +285,7 @@ public class DashboardServiceTests : IDisposable
             Title = title,
             SourceUrl = sourceUrl ?? $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
+            PublishedAt = publishedAt ?? collectedAt ?? now,
             CreatedAt = now,
         };
         _db.NewsItems.Add(item);
@@ -249,7 +298,8 @@ public class DashboardServiceTests : IDisposable
         string programName,
         string? broadcaster = null,
         string? sourceUrl = null,
-        DateTimeOffset? collectedAt = null)
+        DateTimeOffset? collectedAt = null,
+        DateTimeOffset? airedAt = null)
     {
         var now = DateTimeOffset.UtcNow;
         var item = new ProgramAppearance
@@ -259,6 +309,7 @@ public class DashboardServiceTests : IDisposable
             Broadcaster = broadcaster,
             SourceUrl = sourceUrl ?? $"https://example.com/programs/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
+            AiredAt = airedAt ?? collectedAt ?? now,
             CreatedAt = now,
         };
         _db.ProgramAppearances.Add(item);

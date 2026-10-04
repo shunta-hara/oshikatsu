@@ -71,13 +71,23 @@ public class FeedService : IFeedService
             newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt <= toUtc);
         }
 
-        var orderedQuery = newsQuery.OrderByDescending(n => n.CollectedAt);
+        // FEAT-029: PublishedAt 降順、同一のとき ID 降順で並べる
+        var orderedQuery = newsQuery
+            .OrderByDescending(n => n.PublishedAt)
+            .ThenByDescending(n => n.Id);
 
-        var total = await orderedQuery.CountAsync();
-        var rawItems = await orderedQuery
+        // FEAT-030: 画像箱（フォトギャラリー記事）を除外する（メモリでフィルタ）
+        // DB にはバッチ登録時に既に弾いているが、過去データのために一覧取得時にも除外する
+        var allItems = await orderedQuery.ToListAsync();
+        var filteredItems = allItems
+            .Where(n => !GalleryTitleDetector.IsGalleryTitle(n.Title))
+            .ToList();
+
+        var total = filteredItems.Count;
+        var rawItems = filteredItems
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToList();
 
         // 推し名を付与するために Oshi を一括ロード
         var oshiNameMap = await _db.Oshis
@@ -163,13 +173,22 @@ public class FeedService : IFeedService
             programsQuery = programsQuery.Where(p => p.AiredAt != null && p.AiredAt <= toUtc);
         }
 
-        var query = programsQuery.OrderByDescending(p => p.CollectedAt);
+        // FEAT-029: AiredAt 降順、同一のとき ID 降順で並べる
+        var orderedProgramsQuery = programsQuery
+            .OrderByDescending(p => p.AiredAt)
+            .ThenByDescending(p => p.Id);
 
-        var total = await query.CountAsync();
-        var rawItems = await query
+        // FEAT-030: 画像箱（フォトギャラリー記事）を除外する（メモリでフィルタ）
+        var allPrograms = await orderedProgramsQuery.ToListAsync();
+        var filteredPrograms = allPrograms
+            .Where(p => !GalleryTitleDetector.IsGalleryTitle(p.ProgramName))
+            .ToList();
+
+        var total = filteredPrograms.Count;
+        var rawItems = filteredPrograms
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToList();
 
         var oshiNameMap = await _db.Oshis
             .Where(o => oshiIds.Contains(o.Id))

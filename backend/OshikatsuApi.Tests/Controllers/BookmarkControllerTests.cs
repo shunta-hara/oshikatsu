@@ -195,6 +195,43 @@ public class BookmarkControllerTests
         await _bookmarkService.Received(1).GetBookmarksAsync(1, 1, 20);
     }
 
+    // ── FEAT-031: 絞り込みパラメータ ─────────────────────────────────────────
+
+    [Fact]
+    public async Task GetBookmarks_WithOshiId_PassesOshiIdToService()
+    {
+        _bookmarkService.GetBookmarksAsync(1, 1, 20, oshiId: 5)
+            .Returns(EmptyBookmarkPaged());
+
+        await _sut.GetBookmarks(oshiId: 5);
+
+        await _bookmarkService.Received(1).GetBookmarksAsync(1, 1, 20, oshiId: 5);
+    }
+
+    [Fact]
+    public async Task GetBookmarks_WithKeyword_PassesQueryToService()
+    {
+        _bookmarkService.GetBookmarksAsync(1, 1, 20, query: "Python")
+            .Returns(EmptyBookmarkPaged());
+
+        await _sut.GetBookmarks(q: "Python");
+
+        await _bookmarkService.Received(1).GetBookmarksAsync(1, 1, 20, query: "Python");
+    }
+
+    [Fact]
+    public async Task GetBookmarks_WithFromAndTo_PassesDateRangeToService()
+    {
+        var from = new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.FromHours(9));
+        var to = new DateTimeOffset(2026, 10, 2, 23, 59, 59, TimeSpan.FromHours(9));
+        _bookmarkService.GetBookmarksAsync(1, 1, 20, from: from, to: to)
+            .Returns(EmptyBookmarkPaged());
+
+        await _sut.GetBookmarks(from: from, to: to);
+
+        await _bookmarkService.Received(1).GetBookmarksAsync(1, 1, 20, from: from, to: to);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private static PaginatedResponseDto<BookmarkResponseDto> EmptyBookmarkPaged() =>

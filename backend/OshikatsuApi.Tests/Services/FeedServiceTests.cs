@@ -39,14 +39,15 @@ public class FeedServiceTests : IDisposable
         Assert.Equal("ユーザー1のニュース", result.Items[0].Title);
     }
 
+    // FEAT-029: 並び順が PublishedAt の降順、同一のとき ID 降順に変更された
     [Fact]
-    public async Task GetNewsAsync_ReturnsOrderedByCollectedAtDesc()
+    public async Task GetNewsAsync_ReturnsOrderedByPublishedAtDesc()
     {
         var oshi = await CreateOshi(userId: 1, name: "推しA");
         var now = DateTimeOffset.UtcNow;
-        await CreateNewsItem(oshi, "古いニュース", collectedAt: now.AddHours(-2));
-        await CreateNewsItem(oshi, "新しいニュース", collectedAt: now.AddHours(-1));
-        await CreateNewsItem(oshi, "最新ニュース", collectedAt: now);
+        await CreateNewsItem(oshi, "古いニュース", publishedAt: now.AddHours(-2));
+        await CreateNewsItem(oshi, "新しいニュース", publishedAt: now.AddHours(-1));
+        await CreateNewsItem(oshi, "最新ニュース", publishedAt: now);
 
         var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
 
@@ -156,14 +157,15 @@ public class FeedServiceTests : IDisposable
         Assert.Equal("ユーザー1の番組", result.Items[0].ProgramName);
     }
 
+    // FEAT-029: 並び順が AiredAt の降順、同一のとき ID 降順に変更された
     [Fact]
-    public async Task GetProgramsAsync_ReturnsOrderedByCollectedAtDesc()
+    public async Task GetProgramsAsync_ReturnsOrderedByAiredAtDesc()
     {
         var oshi = await CreateOshi(userId: 1, name: "推しA");
         var now = DateTimeOffset.UtcNow;
-        await CreateProgramAppearance(oshi, "古い番組", collectedAt: now.AddHours(-2));
-        await CreateProgramAppearance(oshi, "新しい番組", collectedAt: now.AddHours(-1));
-        await CreateProgramAppearance(oshi, "最新の番組", collectedAt: now);
+        await CreateProgramAppearance(oshi, "古い番組", airedAt: now.AddHours(-2));
+        await CreateProgramAppearance(oshi, "新しい番組", airedAt: now.AddHours(-1));
+        await CreateProgramAppearance(oshi, "最新の番組", airedAt: now);
 
         var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20);
 
@@ -926,6 +928,71 @@ public class FeedServiceTests : IDisposable
         _db.ProgramAppearances.Add(item);
         await _db.SaveChangesAsync();
         return item;
+    }
+
+    // ── GetNewsAsync: 画像箱フィルタ（FEAT-030）────────────────────────────────
+
+    [Theory]
+    [InlineData("(画像3/10) 推しAのイベントレポート")]
+    [InlineData("画像・写真 | 推しA、夏フェスに登場 … 2枚目")]
+    [InlineData("推しAの画像一覧 - オリコン")]
+    [InlineData("写真：推しA 笑顔でレッドカーペット")]
+    public async Task GetNewsAsync_GalleryTitledNewsExcluded_NotInResults(string galleryTitle)
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, galleryTitle);
+        await CreateNewsItem(oshi, "通常ニュース");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        // 画像箱は除外され、通常ニュースのみ返る
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("通常ニュース", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_AllGalleryTitles_ReturnsEmpty()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "(画像1/5) 推しAのフォトギャラリー");
+        await CreateNewsItem(oshi, "写真：推しA 笑顔の1枚");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_MixedGalleryAndNormal_CountsOnlyNormal()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        var now = DateTimeOffset.UtcNow;
+        await CreateNewsItem(oshi, "(画像2/8) フォト", publishedAt: now.AddHours(-2));
+        await CreateNewsItem(oshi, "ニュース1", publishedAt: now.AddHours(-1));
+        await CreateNewsItem(oshi, "ニュース2", publishedAt: now);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.All(result.Items, item => Assert.DoesNotContain("画像", item.Title));
+    }
+
+    // ── GetProgramsAsync: 画像箱フィルタ（FEAT-030）────────────────────────────
+
+    [Theory]
+    [InlineData("推しAの写真一覧")]
+    [InlineData("写真：推しA 舞台挨拶で笑顔")]
+    public async Task GetProgramsAsync_GalleryTitledProgramExcluded_NotInResults(string galleryTitle)
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateProgramAppearance(oshi, galleryTitle);
+        await CreateProgramAppearance(oshi, "出演番組A");
+
+        var result = await _sut.GetProgramsAsync(userId: 1, page: 1, pageSize: 20);
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("出演番組A", result.Items[0].ProgramName);
     }
 
     // ── キーワード検索: 大文字小文字を区別しない（Sprint 25 FEAT-027）──────────

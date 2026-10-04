@@ -147,6 +147,13 @@ public class InternalCollectorService : IInternalCollectorService
 
         foreach (var item in dto.Items)
         {
+            // FEAT-030: 画像箱タイトルはスキップ
+            if (GalleryTitleDetector.IsGalleryTitle(item.Title))
+            {
+                skippedCount++;
+                continue;
+            }
+
             if (!seenInRequest.Add(item.SourceUrl) || existingUrls.Contains(item.SourceUrl))
             {
                 skippedCount++;
@@ -223,6 +230,13 @@ public class InternalCollectorService : IInternalCollectorService
 
         foreach (var item in dto.Items)
         {
+            // FEAT-030: 画像箱タイトルはスキップ
+            if (GalleryTitleDetector.IsGalleryTitle(item.ProgramName))
+            {
+                skippedCount++;
+                continue;
+            }
+
             if (!seenInRequest.Add(item.SourceUrl)
                 || existingProgramUrls.Contains(item.SourceUrl)
                 || existingNewsUrls.Contains(item.SourceUrl))

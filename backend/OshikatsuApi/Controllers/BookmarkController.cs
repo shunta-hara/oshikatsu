@@ -80,6 +80,10 @@ public class BookmarkController : ControllerBase
     /// <summary>ログインユーザーのブックマーク一覧を取得する（登録日時の新しい順）</summary>
     /// <param name="page">ページ番号（1起算）</param>
     /// <param name="pageSize">1ページあたりの件数（デフォルト20、最大100）</param>
+    /// <param name="oshiId">推しIDで絞り込む（任意）。自分の推し以外を指定しても空を返す</param>
+    /// <param name="q">タイトル・要約のキーワード部分一致（英字の大小文字を区別しない）</param>
+    /// <param name="from">掲載日の下限（任意・オフセット付き日時）</param>
+    /// <param name="to">掲載日の上限（任意・オフセット付き日時）</param>
     /// <response code="200">ページネーション付きブックマーク一覧</response>
     /// <response code="401">未認証</response>
     [HttpGet("bookmarks")]
@@ -87,13 +91,17 @@ public class BookmarkController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetBookmarks(
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = DefaultPageSize)
+        [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery] int? oshiId = null,
+        [FromQuery] string? q = null,
+        [FromQuery] DateTimeOffset? from = null,
+        [FromQuery] DateTimeOffset? to = null)
     {
         if (page < 1) page = 1;
         if (pageSize < 1 || pageSize > MaxPageSize) pageSize = DefaultPageSize;
 
         var userId = GetCurrentUserId();
-        var result = await _bookmarkService.GetBookmarksAsync(userId, page, pageSize);
+        var result = await _bookmarkService.GetBookmarksAsync(userId, page, pageSize, oshiId, q, from, to);
         return Ok(result);
     }
 
