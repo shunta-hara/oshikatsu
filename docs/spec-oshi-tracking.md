@@ -372,6 +372,23 @@
   - [ ] 今のニュース由来の「出演情報」リスト（収集済みデータ）はそのまま表示される
   - [ ] backend・collector の変更はない
 
+### FEAT-034: 収集の定期起動を Cloudflare Workers の Cron Triggers に移行する
+- **優先度**: Should
+- **説明**: GitHub Actions の `schedule` イベントは GitHub 側の不具合により実行が作られないことが多く、定期収集の信頼性が低い（2026-08-26 以降、約9回のうち2回しか動いていない）。Cloudflare Workers の Cron Triggers から GitHub の `workflow_dispatch` API を呼ぶことで定期起動を外部化し、手動実行と同じ確実な経路で collector を動かす。Worker はモノレポの `scheduler/` ディレクトリに追加する。GitHub Actions の `schedule` は予備として残し、Cloudflare と GitHub 両方が動いて二重起動しても既存の concurrency 設定で問題が起きないようにする。Cloudflare の無料枠で動作すること。
+- **受け入れ基準**:
+  - [ ] `scheduler/` ディレクトリに Cloudflare Worker のコードと設定ファイルが存在する
+  - [ ] Worker は UTC 毎偶数時 17 分（`17 */2 * * *`）に自動起動する Cron Trigger を持つ
+  - [ ] Worker は GitHub の `POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches` API を呼び、`collect.yml` を `master` ブランチ・`oshi_id` 空（全推し）で起動する
+  - [ ] 対象リポジトリ名・ワークフローファイル名・ブランチは環境変数（Wrangler の vars / secrets）で設定でき、コードに直書きしない
+  - [ ] GitHub トークンは Worker の secret として管理し、リポジトリや設定ファイルに含まれない
+  - [ ] GitHub API が一時的に失敗した場合（ネットワークエラー・5xx・429）は最大3回・指数バックオフでリトライし、それ以上は再試行しない
+  - [ ] 起動成功・失敗がどちらも Cloudflare のログで確認できる形でログ出力される
+  - [ ] GitHub Actions の `schedule` は `.github/workflows/collect.yml` に残っており、手動・スケジュールの両方から引き続き起動できる
+  - [ ] `.claude/rules/architecture.md` の「ディレクトリ構成」に `scheduler/` が追記されている
+  - [ ] `docs/deploy-guide.md` に Worker のデプロイ手順・GitHub トークンの作成手順・Cloudflare への secret 登録手順・動作確認の方法が追記されている
+  - [ ] 自動テストで GitHub API を実際に呼ばず（モックで）、正しい URL・ヘッダー・本文でリクエストが送られることを確認できる
+  - [ ] 自動テストで、一時的なエラー時に指定回数リトライすること・上限回数を超えたら停止してログを出すことを確認できる
+
 ---
 
 ## スプリント計画
@@ -706,6 +723,20 @@
   - [ ] 今のニュース由来の出演情報リストがそのまま表示されている（FEAT-033）
   - [ ] backend・collector に変更がない（FEAT-033）
   - [ ] 既存の Vitest テストが引き続きパスする（FEAT-033）
+
+### Sprint 31: Cloudflare Workers による収集定期起動の追加
+- **対象機能**: FEAT-034
+- **主体層**: scheduler（新規層。frontend・backend・collector のコードは変更しない）
+- **完了条件**:
+  - [ ] `scheduler/` ディレクトリが存在し、Worker のコード・`wrangler.toml`（または相当する設定ファイル）・`package.json` が含まれる（FEAT-034）
+  - [ ] `wrangler.toml` に Cron Trigger `17 */2 * * *` が定義されている（FEAT-034）
+  - [ ] Worker のコードが GitHub `workflow_dispatch` API を正しい URL・ヘッダー・本文で呼ぶことを、モックを使った自動テストで確認できる（FEAT-034）
+  - [ ] 一時的なエラー時（5xx・429・ネットワーク失敗）に最大3回リトライし、上限を超えたらログ出力して停止することをテストで確認できる（FEAT-034）
+  - [ ] `scheduler/` で `npm test`（または相当するテスト実行コマンド）が正常にパスする（FEAT-034）
+  - [ ] `npm run build`（または `wrangler deploy --dry-run`）が正常に完了する（FEAT-034）
+  - [ ] `.claude/rules/architecture.md` の「ディレクトリ構成」に `scheduler/` が追記されている（FEAT-034）
+  - [ ] `docs/deploy-guide.md` に Cloudflare へのデプロイ手順・GitHub トークンの作成手順・secret 登録手順・動作確認の方法が追記されている（FEAT-034）
+  - [ ] `.github/workflows/collect.yml` の `schedule` が残っており、既存の動作が変わっていない（FEAT-034）
 
 ---
 
