@@ -40,11 +40,16 @@ docs/spec-oshi-tracking.md に仕様書を生成・追記済み。
 - FEAT-033（Sprint 30）: 推しごとの「番組表で探す」リンク（Gガイド・J:COM）/ frontend / Should。Sprint 30 は実装・合格済み
 - FEAT-034（Sprint 31）: 収集定期起動を Cloudflare Workers Cron Triggers に移行。scheduler/ ディレクトリ追加、GitHub workflow_dispatch API 呼び出し、3回リトライ、secrets 管理 / scheduler（新規層）/ Should
 
+2026-10-04 追記内容（FEAT-035〜036）:
+- FEAT-035（Sprint 32 backend + Sprint 33 frontend）: 転載記事の重複まとめ表示。タイトル正規化（媒体名除去・前置き除去・全角半角統一）+ 48時間以内・同一推し内でまとめ。保存は全件行い表示でまとめる。代表は元媒体優先（転載先リスト管理）→掲載日早い順。「ほか N 媒体」開閉UI。ブックマーク一覧は対象外 / backend+frontend / Must
+- FEAT-036（Sprint 32 backend+collector + Sprint 33 frontend）: description の HTML 文字参照デコード不具合修正 + 概要の代わりに媒体名を表示。媒体名は RSS タイトル末尾 ` - 媒体名` または `<source>` から取得・保存 / collector+backend+frontend / Must
+
 技術的背景:
 - collector 書き込みは backend 内部 API 経由（直接 DB 書き込みは不採用）
 - デプロイ先: frontend=Cloudflare Pages / backend=Render / DB=Neon / collector=GitHub Actions / scheduler=Cloudflare Workers
 - 収集間隔: 2時間ごと（UTC 毎偶数時 17 分、`17 */2 * * *`）
 - GitHub Actions schedule が 2026-08-26 以降不安定（9回中2回のみ起動）→ Cloudflare Workers Cron で補完
+- 重複まとめ: タイトル正規化は backend 1か所で管理（FEAT-030 の画像箱判定と同じ考え方）。転載先媒体名リスト（Yahoo!・Infoseek・auWeb・ライブドア・goo・エキサイト・BIGLOBE・dメニュー・LINE NEWS・MSN・ニコニコ）も同1か所
 
-**Why:** 2026-10-04 本番運用で、フィードが古い順・画像箱ノイズ・ブックマーク絞り込み不足・ニュースと出演情報が混在・定期収集の信頼性問題が確認された。
-**How to apply:** 次に仕様追記を依頼されたら FEAT-035〜、Sprint 32〜 から採番する。
+**Why:** 2026-10-04 本番運用で、フィードが古い順・画像箱ノイズ・ブックマーク絞り込み不足・ニュースと出演情報が混在・定期収集の信頼性問題が確認された。同日さらに転載重複（同一記事が元媒体・転載先で重複表示）と description の &nbsp; 不具合が確認された。
+**How to apply:** 次に仕様追記を依頼されたら FEAT-037〜、Sprint 34〜 から採番する。
