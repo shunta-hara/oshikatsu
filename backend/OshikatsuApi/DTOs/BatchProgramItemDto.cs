@@ -28,4 +28,8 @@ public class BatchProgramItemDto
     /// <summary>collector が収集した日時</summary>
     [Required]
     public DateTimeOffset CollectedAt { get; set; }
+
+    /// <summary>媒体名（FEAT-036）。RSS のタイトル末尾から抽出。取得できない場合は null。</summary>
+    [MaxLength(200)]
+    public string? SourceName { get; set; }
 }

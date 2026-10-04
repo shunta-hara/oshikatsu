@@ -173,6 +173,7 @@ public class InternalCollectorService : IInternalCollectorService
                 PublishedAt = publishedAt,
                 IsPublishedAtEstimated = isEstimated,
                 CollectedAt = collectedAt,
+                SourceName = string.IsNullOrWhiteSpace(item.SourceName) ? null : item.SourceName.Trim(),
                 CreatedAt = now,
             });
         }
@@ -258,6 +259,7 @@ public class InternalCollectorService : IInternalCollectorService
                 IsAiredAtEstimated = isEstimated,
                 SourceUrl = item.SourceUrl,
                 CollectedAt = collectedAt,
+                SourceName = string.IsNullOrWhiteSpace(item.SourceName) ? null : item.SourceName.Trim(),
                 CreatedAt = now,
             });
         }

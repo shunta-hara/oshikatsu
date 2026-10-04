@@ -73,6 +73,7 @@ def run_news_collection(
                 collected_at=collected_at,
                 summary=entry.summary,
                 published_at=entry.published_at,
+                source_name=entry.source_name,
             )
             for entry in entries
         ]

@@ -126,6 +126,11 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("published_at");
 
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_name");
+
                     b.Property<string>("SourceUrl")
                         .IsRequired()
                         .HasColumnType("text")
@@ -223,6 +228,11 @@ namespace OshikatsuApi.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("program_name");
+
+                    b.Property<string>("SourceName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_name");
 
                     b.Property<string>("SourceUrl")
                         .IsRequired()

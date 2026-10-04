@@ -256,3 +256,41 @@ class TestRunNewsCollection:
 
         call_kwargs = client.post_job_log.call_args.kwargs
         assert call_kwargs["success_count"] == 2  # 2推し × saved_count=1
+
+    # ── FEAT-036: source_name の伝播 ─────────────────────────────────────────
+
+    def test_run_collection_batch_items_contain_source_name(self) -> None:
+        """NewsEntry の source_name が NewsBatchItem に引き継がれる"""
+        entry_with_source = NewsEntry(
+            title="記事 - スポニチ",
+            source_url="https://example.com/sponichi",
+            published_at=_NOW,
+            summary="要約",
+            source_name="スポニチ",
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[entry_with_source])
+
+        run_news_collection(client, fetcher, [_OSHI_A])
+
+        items: list[NewsBatchItem] = client.post_news_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+        assert items[0].source_name == "スポニチ"
+
+    def test_run_collection_batch_items_source_name_none_when_not_extracted(self) -> None:
+        """source_name が None の場合もエラーにならず None として渡す"""
+        entry_no_source = NewsEntry(
+            title="媒体名なし記事",
+            source_url="https://example.com/nosource",
+            published_at=_NOW,
+            summary=None,
+            source_name=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[entry_no_source])
+
+        run_news_collection(client, fetcher, [_OSHI_A])
+
+        items: list[NewsBatchItem] = client.post_news_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+        assert items[0].source_name is None

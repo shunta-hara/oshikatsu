@@ -10,6 +10,7 @@ from collector.program_fetcher import (
     ProgramEntry,
     ProgramFetcher,
     _backoff,
+    _extract_source_name_from_title,
     _parse_pub_date,
 )
 
@@ -273,3 +274,73 @@ class TestHelpers:
 
     def test_backoff_large_attempt_capped_at_60(self) -> None:
         assert _backoff(100) == 60
+
+    # ── FEAT-036: タイトルからの媒体名抽出 ──────────────────────────────────────
+
+    def test_extract_source_name_from_title_normal(self) -> None:
+        result = _extract_source_name_from_title("番組名 - Weverse")
+        assert result == "Weverse"
+
+    def test_extract_source_name_from_title_last_dash(self) -> None:
+        result = _extract_source_name_from_title("KAWAII LAB. Weverse LIVE - CS Kana Itak - Weverse")
+        assert result == "Weverse"
+
+    def test_extract_source_name_from_title_no_dash(self) -> None:
+        result = _extract_source_name_from_title("ダッシュなし番組名")
+        assert result is None
+
+    def test_extract_source_name_from_title_empty(self) -> None:
+        result = _extract_source_name_from_title("")
+        assert result is None
+
+
+class TestProgramSourceName:
+    """FEAT-036: ProgramFetcher が source_name を抽出するテスト"""
+
+    _RSS_URL = "https://news.google.com/rss/search"
+
+    _RSS_WITH_MEDIA = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>推しA 番組出演情報 - Weverse</title>
+      <link>https://example.com/prog1</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    _RSS_WITHOUT_MEDIA = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>媒体名なし番組情報</title>
+      <link>https://example.com/prog2</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    @resp.activate
+    def test_source_name_extracted_from_title(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_WITH_MEDIA, status=200,
+                 content_type="application/rss+xml")
+        fetcher = ProgramFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        assert entries[0].source_name == "Weverse"
+
+    @resp.activate
+    def test_source_name_is_none_when_no_dash(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_WITHOUT_MEDIA, status=200,
+                 content_type="application/rss+xml")
+        fetcher = ProgramFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        assert entries[0].source_name is None

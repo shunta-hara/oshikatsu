@@ -761,3 +761,116 @@ class TestHelpers:
 
     def test_backoff_large_attempt_capped_at_60(self) -> None:
         assert _backoff(100) == 60
+
+
+class TestSourceNameInPayload:
+    """FEAT-036: source_name が API ペイロードに含まれるテスト"""
+
+    NEWS_BATCH_URL = "http://backend:8080/api/v1/internal/news/batch"
+    PROGRAM_BATCH_URL = "http://backend:8080/api/v1/internal/programs/batch"
+
+    @resp.activate
+    def test_post_news_batch_includes_source_name_in_payload(self) -> None:
+        """source_name が指定されているとき JSON ペイロードに sourceName が含まれる"""
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            NewsBatchItem(
+                title="記事 - スポニチ",
+                source_url="https://example.com/1",
+                collected_at=datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc),
+                source_name="スポニチ",
+            )
+        ]
+
+        client.post_news_batch(oshi_id=1, items=items)
+
+        raw_body = resp.calls[0].request.body
+        body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
+        import json as _json
+        payload = _json.loads(body)
+        assert "sourceName" in payload["items"][0]
+        assert payload["items"][0]["sourceName"] == "スポニチ"
+
+    @resp.activate
+    def test_post_news_batch_omits_source_name_when_none(self) -> None:
+        """source_name が None のとき JSON ペイロードに sourceName が含まれない"""
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            NewsBatchItem(
+                title="媒体名なし",
+                source_url="https://example.com/2",
+                collected_at=datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc),
+                source_name=None,
+            )
+        ]
+
+        client.post_news_batch(oshi_id=1, items=items)
+
+        raw_body = resp.calls[0].request.body
+        body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
+        assert "sourceName" not in body
+
+    @resp.activate
+    def test_post_program_batch_includes_source_name_in_payload(self) -> None:
+        """ProgramBatchItem の source_name が JSON ペイロードに含まれる"""
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="番組 - Weverse",
+                source_url="https://weverse.io/prog",
+                collected_at=datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc),
+                source_name="Weverse",
+            )
+        ]
+
+        client.post_program_batch(oshi_id=1, items=items)
+
+        raw_body = resp.calls[0].request.body
+        body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
+        import json as _json
+        payload = _json.loads(body)
+        assert "sourceName" in payload["items"][0]
+        assert payload["items"][0]["sourceName"] == "Weverse"
+
+    @resp.activate
+    def test_post_program_batch_omits_source_name_when_none(self) -> None:
+        """ProgramBatchItem の source_name が None のとき sourceName が省略される"""
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="番組名",
+                source_url="https://example.com/prog",
+                collected_at=datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc),
+                source_name=None,
+            )
+        ]
+
+        client.post_program_batch(oshi_id=1, items=items)
+
+        raw_body = resp.calls[0].request.body
+        body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
+        assert "sourceName" not in body

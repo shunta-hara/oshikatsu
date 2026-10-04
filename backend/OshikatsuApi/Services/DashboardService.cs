@@ -39,9 +39,14 @@ public class DashboardService : IDashboardService
             .ThenByDescending(n => n.Id)
             .ToListAsync();
 
-        var latestNewsByOshiId = newsItems
+        // FEAT-035: 転載重複まとめ後に推しごと最新1件を取得
+        var filteredNewsItems = newsItems
             .Where(n => !GalleryTitleDetector.IsGalleryTitle(n.Title))
-            .GroupBy(n => n.OshiId)
+            .ToList();
+        var newsGroups = ArticleDeduplicator.GroupNewsItems(filteredNewsItems);
+        // 代表の推しIDごとに最新（最初）のグループを取得
+        var latestNewsGroupByOshiId = newsGroups
+            .GroupBy(g => g.Representative.OshiId)
             .ToDictionary(g => g.Key, g => g.First());
 
         // クエリ 3: 全推しの出演番組を AiredAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
@@ -55,9 +60,13 @@ public class DashboardService : IDashboardService
             .ThenByDescending(p => p.Id)
             .ToListAsync();
 
-        var latestProgramByOshiId = programItems
+        // FEAT-035: 転載重複まとめ後に推しごと最新1件を取得
+        var filteredProgramItems = programItems
             .Where(p => !GalleryTitleDetector.IsGalleryTitle(p.ProgramName))
-            .GroupBy(p => p.OshiId)
+            .ToList();
+        var programGroups = ArticleDeduplicator.GroupProgramItems(filteredProgramItems);
+        var latestProgramGroupByOshiId = programGroups
+            .GroupBy(g => g.Representative.OshiId)
             .ToDictionary(g => g.Key, g => g.First());
 
         // 3 クエリ合計（N+1 なし）でカードを組み立てて返す
@@ -65,23 +74,45 @@ public class DashboardService : IDashboardService
         {
             OshiId = o.Id,
             OshiName = o.Name,
-            LatestNews = latestNewsByOshiId.TryGetValue(o.Id, out var news)
+            LatestNews = latestNewsGroupByOshiId.TryGetValue(o.Id, out var newsGroup)
                 ? new NewsItemSummaryDto
                 {
-                    Id = news.Id,
-                    Title = news.Title,
-                    SourceUrl = news.SourceUrl,
-                    CollectedAt = news.CollectedAt,
+                    Id = newsGroup.Representative.Id,
+                    Title = newsGroup.Representative.Title,
+                    SourceUrl = newsGroup.Representative.SourceUrl,
+                    CollectedAt = newsGroup.Representative.CollectedAt,
+                    SourceName = !string.IsNullOrEmpty(newsGroup.Representative.SourceName)
+                        ? newsGroup.Representative.SourceName
+                        : ArticleDeduplicator.ExtractSourceNameFromTitle(newsGroup.Representative.Title),
+                    OtherSourceCount = newsGroup.Others.Count,
+                    OtherSources = newsGroup.Others.Select(ot => new OshikatsuApi.DTOs.OtherSourceDto
+                    {
+                        SourceName = !string.IsNullOrEmpty(ot.SourceName)
+                            ? ot.SourceName
+                            : ArticleDeduplicator.ExtractSourceNameFromTitle(ot.Title),
+                        SourceUrl = ot.SourceUrl,
+                    }).ToList(),
                 }
                 : null,
-            LatestProgram = latestProgramByOshiId.TryGetValue(o.Id, out var program)
+            LatestProgram = latestProgramGroupByOshiId.TryGetValue(o.Id, out var programGroup)
                 ? new ProgramAppearanceSummaryDto
                 {
-                    Id = program.Id,
-                    ProgramName = program.ProgramName,
-                    Broadcaster = program.Broadcaster,
-                    SourceUrl = program.SourceUrl,
-                    CollectedAt = program.CollectedAt,
+                    Id = programGroup.Representative.Id,
+                    ProgramName = programGroup.Representative.ProgramName,
+                    Broadcaster = programGroup.Representative.Broadcaster,
+                    SourceUrl = programGroup.Representative.SourceUrl,
+                    CollectedAt = programGroup.Representative.CollectedAt,
+                    SourceName = !string.IsNullOrEmpty(programGroup.Representative.SourceName)
+                        ? programGroup.Representative.SourceName
+                        : ArticleDeduplicator.ExtractSourceNameFromTitle(programGroup.Representative.ProgramName),
+                    OtherSourceCount = programGroup.Others.Count,
+                    OtherSources = programGroup.Others.Select(ot => new OshikatsuApi.DTOs.OtherSourceDto
+                    {
+                        SourceName = !string.IsNullOrEmpty(ot.SourceName)
+                            ? ot.SourceName
+                            : ArticleDeduplicator.ExtractSourceNameFromTitle(ot.ProgramName),
+                        SourceUrl = ot.SourceUrl,
+                    }).ToList(),
                 }
                 : null,
         }).ToList();

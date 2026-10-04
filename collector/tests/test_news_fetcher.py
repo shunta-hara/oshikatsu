@@ -6,7 +6,14 @@ from datetime import timezone
 import pytest
 import responses as resp
 
-from collector.news_fetcher import NewsFetcher, NewsEntry, _parse_pub_date, _strip_html
+from collector.news_fetcher import (
+    NewsFetcher,
+    NewsEntry,
+    _decode_html_entities,
+    _extract_source_name_from_title,
+    _parse_pub_date,
+    _strip_html,
+)
 
 # テスト用推し名
 _OSHI_NAME = "test-oshi"
@@ -268,3 +275,154 @@ class TestHelpers:
     def test_parse_pub_date_empty_returns_none(self) -> None:
         result = _parse_pub_date("")
         assert result is None
+
+    # ── FEAT-036: HTML 文字参照デコード ─────────────────────────────────────────
+
+    def test_decode_html_entities_nbsp(self) -> None:
+        result = _decode_html_entities("text&nbsp;&nbsp;media")
+        assert "\xa0" in result or "text" in result
+        assert "&nbsp;" not in result
+
+    def test_decode_html_entities_amp(self) -> None:
+        result = _decode_html_entities("A &amp; B")
+        assert result == "A & B"
+
+    def test_decode_html_entities_lt_gt(self) -> None:
+        result = _decode_html_entities("&lt;p&gt;text&lt;/p&gt;")
+        assert result == "<p>text</p>"
+
+    def test_decode_html_entities_no_entities(self) -> None:
+        result = _decode_html_entities("plain text")
+        assert result == "plain text"
+
+    def test_decode_html_entities_empty(self) -> None:
+        result = _decode_html_entities("")
+        assert result == ""
+
+    # ── FEAT-036: タイトルからの媒体名抽出 ──────────────────────────────────────
+
+    def test_extract_source_name_from_title_normal(self) -> None:
+        result = _extract_source_name_from_title("記事タイトル - スポニチ Sponichi Annex")
+        assert result == "スポニチ Sponichi Annex"
+
+    def test_extract_source_name_from_title_last_dash(self) -> None:
+        # 複数の ` - ` がある場合は最後を使う
+        result = _extract_source_name_from_title("KAWAII LAB. Weverse LIVE - CS Kana Itak - Weverse")
+        assert result == "Weverse"
+
+    def test_extract_source_name_from_title_no_dash(self) -> None:
+        result = _extract_source_name_from_title("ダッシュなし記事")
+        assert result is None
+
+    def test_extract_source_name_from_title_empty(self) -> None:
+        result = _extract_source_name_from_title("")
+        assert result is None
+
+
+class TestSourceNameExtraction:
+    """FEAT-036: NewsFetcher が source_name を抽出するテスト"""
+
+    # RSS に <source> 要素があればそれを使う
+    _RSS_WITH_SOURCE = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>推しAの記事 - Yahoo!ニュース</title>
+      <link>https://example.com/1</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+      <source url="https://www.sponichi.co.jp">スポニチアネックス</source>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    # <source> 要素なし → タイトル末尾から抽出
+    _RSS_WITHOUT_SOURCE = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>推しAの記事 - モデルプレス</title>
+      <link>https://example.com/2</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    # タイトルに ` - ` なし → source_name は None
+    _RSS_NO_DASH_TITLE = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>媒体名なし記事タイトル</title>
+      <link>https://example.com/3</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    # description に HTML 文字参照が含まれる Google News 形式
+    _RSS_HTML_ENTITIES_DESC = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <item>
+      <title>記事タイトル - スポニチ</title>
+      <link>https://example.com/4</link>
+      <pubDate>Mon, 14 Jul 2026 09:00:00 GMT</pubDate>
+      <description>&lt;a href="https://example.com"&gt;記事タイトル&lt;/a&gt;&amp;nbsp;&amp;nbsp;&lt;font&gt;スポニチ&lt;/font&gt;</description>
+    </item>
+  </channel>
+</rss>
+""".encode("utf-8")
+
+    _RSS_URL = "https://news.google.com/rss/search"
+
+    @resp.activate
+    def test_source_name_from_source_element(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_WITH_SOURCE, status=200,
+                 content_type="application/rss+xml")
+        fetcher = NewsFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        # <source> 要素の内容が優先される
+        assert entries[0].source_name == "スポニチアネックス"
+
+    @resp.activate
+    def test_source_name_from_title_suffix(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_WITHOUT_SOURCE, status=200,
+                 content_type="application/rss+xml")
+        fetcher = NewsFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        assert entries[0].source_name == "モデルプレス"
+
+    @resp.activate
+    def test_source_name_is_none_when_no_dash_in_title(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_NO_DASH_TITLE, status=200,
+                 content_type="application/rss+xml")
+        fetcher = NewsFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        assert entries[0].source_name is None
+
+    @resp.activate
+    def test_description_html_entities_decoded(self) -> None:
+        resp.add(resp.GET, self._RSS_URL, body=self._RSS_HTML_ENTITIES_DESC, status=200,
+                 content_type="application/rss+xml")
+        fetcher = NewsFetcher(timeout=5, max_retries=1)
+
+        entries = fetcher.fetch_for_oshi("推しA")
+
+        assert len(entries) == 1
+        # &amp;nbsp; が デコードされて &nbsp; になり、さらに \xa0 になる
+        # また &lt;a&gt; タグは除去されて文字列が残る
+        summary = entries[0].summary or ""
+        assert "&amp;" not in summary
+        assert "&nbsp;" not in summary

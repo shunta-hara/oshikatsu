@@ -63,12 +63,13 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
         await _db.SaveChangesAsync();
     }
 
-    private async Task AddProgramAsync(int oshiId, string sourceUrl, string name = "番組")
+    private async Task AddProgramAsync(int oshiId, string sourceUrl, string? name = null)
     {
+        // デフォルト名は sourceUrl を含めて一意にする（FEAT-035 の転載重複まとめが誤動作しないよう）
         _db.ProgramAppearances.Add(new ProgramAppearance
         {
             OshiId = oshiId,
-            ProgramName = name,
+            ProgramName = name ?? $"番組_{sourceUrl}",
             Broadcaster = "テストTV",
             AiredAt = _now,
             IsAiredAtEstimated = false,

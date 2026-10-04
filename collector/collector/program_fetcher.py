@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 
@@ -35,6 +35,18 @@ class ProgramEntry:
     source_url: str
     aired_at: datetime | None
     broadcaster: str | None
+    source_name: str | None = field(default=None)
+
+
+def _extract_source_name_from_title(title: str) -> str | None:
+    """
+    タイトル末尾の ` - 媒体名` から媒体名を取り出す（FEAT-036）。
+    ` - ` が存在しない場合は None を返す。媒体名は最後の ` - ` の後ろ。
+    """
+    idx = title.rfind(" - ")
+    if idx < 0:
+        return None
+    return title[idx + 3:].strip() or None
 
 
 def _parse_pub_date(pub_date_str: str) -> datetime | None:
@@ -151,12 +163,16 @@ class ProgramFetcher:
             if pub_date_el is not None and pub_date_el.text:
                 aired_at = _parse_pub_date(pub_date_el.text.strip())
 
+            # FEAT-036: タイトル末尾 ` - 媒体名` から媒体名を取得
+            source_name = _extract_source_name_from_title(title)
+
             entries.append(
                 ProgramEntry(
                     program_name=program_name,
                     source_url=link,
                     aired_at=aired_at,
                     broadcaster=None,
+                    source_name=source_name,
                 )
             )
 

@@ -364,3 +364,51 @@ class TestRunProgramCollection:
 
         call_kwargs = client.post_job_log.call_args.kwargs
         assert call_kwargs["success_count"] == 2  # 2推し × saved_count=1
+
+    # ── FEAT-036: source_name の伝播 ─────────────────────────────────────────
+
+    def test_run_collection_batch_items_contain_source_name(self) -> None:
+        """ProgramEntry の source_name が ProgramBatchItem に引き継がれる"""
+        entry_with_source = ProgramEntry(
+            program_name="推しA 出演番組 - Weverse",
+            source_url="https://weverse.io/prog",
+            aired_at=_NOW,
+            broadcaster=None,
+            source_name="Weverse",
+        )
+        client = MagicMock(spec=BackendClient)
+        client.post_program_batch.return_value = BatchResult(
+            received_count=1, saved_count=1, skipped_count=0
+        )
+        client.post_job_log.return_value = {"id": 1}
+        fetcher = MagicMock(spec=ProgramFetcher)
+        fetcher.fetch_for_oshi.return_value = [entry_with_source]
+
+        run_program_collection(client, fetcher, [_OSHI_A])
+
+        items: list[ProgramBatchItem] = client.post_program_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+        assert items[0].source_name == "Weverse"
+
+    def test_run_collection_batch_items_source_name_none_when_absent(self) -> None:
+        """source_name が None の場合もエラーにならず None として渡す"""
+        entry_no_source = ProgramEntry(
+            program_name="推しA 出演番組情報",
+            source_url="https://example.com/prog-no-source",
+            aired_at=_NOW,
+            broadcaster=None,
+            source_name=None,
+        )
+        client = MagicMock(spec=BackendClient)
+        client.post_program_batch.return_value = BatchResult(
+            received_count=1, saved_count=1, skipped_count=0
+        )
+        client.post_job_log.return_value = {"id": 1}
+        fetcher = MagicMock(spec=ProgramFetcher)
+        fetcher.fetch_for_oshi.return_value = [entry_no_source]
+
+        run_program_collection(client, fetcher, [_OSHI_A])
+
+        items: list[ProgramBatchItem] = client.post_program_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+        assert items[0].source_name is None

@@ -5,6 +5,12 @@ metadata:
   type: project
 ---
 
+Sprint 32 評価：合格（1回目）。FEAT-035（転載重複まとめ backend）・FEAT-036（媒体名表示・文字参照修正）。backend 473/473・collector 194/194。ArticleDeduplicator が転載ロジックと RepostMediaNames を1か所に集約。マイグレーション自動適用確認済み。
+
+**How to apply:** Sprint 32 合格。次は Sprint 33（転載重複まとめ・媒体名の frontend 実装 FEAT-035/036 frontend 部分）。
+
+---
+
 Sprint 31 評価：合格（2回目）。FEAT-034（Cloudflare Workers 定期起動）。
 
 **Why:** 1回目は ScheduledEvent→ScheduledController 型エラーで不合格。2回目で修正済み。tsc 0エラー、vitest 15/15、wrangler dry-run 成功。動的テスト: `/__scheduled` → 空トークン → 401 受信 → 非リトライ → エラーログ確認。GITHUB_DISPATCH_TOKEN は wrangler.toml [vars] に存在せず（secret）。AbortSignal.timeout タイムアウト実装・テスト3件確認済み。

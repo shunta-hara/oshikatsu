@@ -18,4 +18,13 @@ public class NewsItemResponseDto
     /// フィード一覧では null の場合があるため nullable とする。
     /// </summary>
     public bool? IsBookmarked { get; set; }
+
+    /// <summary>媒体名（FEAT-036）。DB に保存されていない場合はタイトル末尾から取り出す。</summary>
+    public string? SourceName { get; set; }
+
+    /// <summary>まとめた他媒体の件数（FEAT-035）。同一記事が他媒体に転載されている数。</summary>
+    public int OtherSourceCount { get; set; }
+
+    /// <summary>まとめた他媒体のリンク一覧（FEAT-035）。</summary>
+    public IReadOnlyList<OtherSourceDto> OtherSources { get; set; } = [];
 }

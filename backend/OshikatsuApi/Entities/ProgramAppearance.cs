@@ -31,6 +31,9 @@ public class ProgramAppearance
     /// <summary>collector が収集した日時（UTC）</summary>
     public DateTimeOffset CollectedAt { get; set; }
 
+    /// <summary>媒体名（例: Weverse）。collector が RSS から抽出する。任意。</summary>
+    public string? SourceName { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     // Navigation

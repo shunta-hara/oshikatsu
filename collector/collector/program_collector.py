@@ -137,6 +137,7 @@ def run_program_collection(
                 collected_at=collected_at,
                 broadcaster=entry.broadcaster,
                 aired_at=entry.aired_at,
+                source_name=entry.source_name,
             )
             for entry in entries
         ]

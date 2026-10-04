@@ -78,6 +78,9 @@ public class AppDbContext : DbContext
             entity.Property(e => e.IsPublishedAtEstimated)
                   .HasColumnName("is_published_at_estimated");
             entity.Property(e => e.CollectedAt).HasColumnName("collected_at");
+            entity.Property(e => e.SourceName)
+                  .HasColumnName("source_name")
+                  .HasMaxLength(200);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
 
             entity.HasOne(e => e.Oshi)
@@ -107,6 +110,9 @@ public class AppDbContext : DbContext
                   .HasColumnName("is_aired_at_estimated");
             entity.Property(e => e.SourceUrl).HasColumnName("source_url").IsRequired();
             entity.Property(e => e.CollectedAt).HasColumnName("collected_at");
+            entity.Property(e => e.SourceName)
+                  .HasColumnName("source_name")
+                  .HasMaxLength(200);
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
 
             entity.HasOne(e => e.Oshi)

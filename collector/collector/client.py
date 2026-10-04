@@ -46,6 +46,7 @@ class NewsBatchItem:
     collected_at: datetime
     summary: str | None = None
     published_at: datetime | None = None
+    source_name: str | None = None
 
 
 @dataclass
@@ -57,6 +58,7 @@ class ProgramBatchItem:
     collected_at: datetime
     broadcaster: str | None = None
     aired_at: datetime | None = None
+    source_name: str | None = None
 
 
 class BackendClient:
@@ -154,6 +156,8 @@ class BackendClient:
                 entry["summary"] = item.summary
             if item.published_at is not None:
                 entry["publishedAt"] = _to_iso(item.published_at)
+            if item.source_name is not None:
+                entry["sourceName"] = item.source_name
             items_payload.append(entry)
 
         payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}
@@ -237,6 +241,8 @@ class BackendClient:
                 entry["broadcaster"] = item.broadcaster
             if item.aired_at is not None:
                 entry["airedAt"] = _to_iso(item.aired_at)
+            if item.source_name is not None:
+                entry["sourceName"] = item.source_name
             items_payload.append(entry)
 
         payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}

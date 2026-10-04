@@ -83,8 +83,11 @@ public class FeedService : IFeedService
             .Where(n => !GalleryTitleDetector.IsGalleryTitle(n.Title))
             .ToList();
 
-        var total = filteredItems.Count;
-        var rawItems = filteredItems
+        // FEAT-035: 転載重複まとめ（メモリでグループ化）
+        var groups = ArticleDeduplicator.GroupNewsItems(filteredItems);
+
+        var total = groups.Count;
+        var pageGroups = groups
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
@@ -94,26 +97,47 @@ public class FeedService : IFeedService
             .Where(o => oshiIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name);
 
-        // ブックマーク済みIDセットを取得（現在ページのニュースのみ対象）
-        var rawItemIds = rawItems.Select(n => n.Id).ToList();
+        // ブックマーク済みIDセットを取得（現在ページのグループ内の全アイテム ID を対象）
+        var allGroupItemIds = pageGroups
+            .SelectMany(g => g.Others.Select(o => o.Id).Prepend(g.Representative.Id))
+            .ToList();
         var bookmarkedIdsList = await _db.Bookmarks
-            .Where(b => b.UserId == userId && rawItemIds.Contains(b.NewsItemId))
+            .Where(b => b.UserId == userId && allGroupItemIds.Contains(b.NewsItemId))
             .Select(b => b.NewsItemId)
             .ToListAsync();
         var bookmarkedIds = new HashSet<int>(bookmarkedIdsList);
 
-        var items = rawItems.Select(n => new NewsItemResponseDto
+        var items = pageGroups.Select(g =>
         {
-            Id = n.Id,
-            OshiId = n.OshiId,
-            OshiName = oshiNameMap.GetValueOrDefault(n.OshiId) ?? string.Empty,
-            Title = n.Title,
-            Summary = n.Summary,
-            SourceUrl = n.SourceUrl,
-            PublishedAt = n.PublishedAt,
-            IsPublishedAtEstimated = n.IsPublishedAtEstimated,
-            CollectedAt = n.CollectedAt,
-            IsBookmarked = bookmarkedIds.Contains(n.Id),
+            var n = g.Representative;
+            var sourceName = !string.IsNullOrEmpty(n.SourceName)
+                ? n.SourceName
+                : ArticleDeduplicator.ExtractSourceNameFromTitle(n.Title);
+            // グループ内のいずれかがブックマーク済みなら代表をブックマーク済みとする
+            var isBookmarked = g.Others.Any(o => bookmarkedIds.Contains(o.Id))
+                || bookmarkedIds.Contains(n.Id);
+            return new NewsItemResponseDto
+            {
+                Id = n.Id,
+                OshiId = n.OshiId,
+                OshiName = oshiNameMap.GetValueOrDefault(n.OshiId) ?? string.Empty,
+                Title = n.Title,
+                Summary = n.Summary,
+                SourceUrl = n.SourceUrl,
+                PublishedAt = n.PublishedAt,
+                IsPublishedAtEstimated = n.IsPublishedAtEstimated,
+                CollectedAt = n.CollectedAt,
+                IsBookmarked = isBookmarked,
+                SourceName = sourceName,
+                OtherSourceCount = g.Others.Count,
+                OtherSources = g.Others.Select(o => new OtherSourceDto
+                {
+                    SourceName = !string.IsNullOrEmpty(o.SourceName)
+                        ? o.SourceName
+                        : ArticleDeduplicator.ExtractSourceNameFromTitle(o.Title),
+                    SourceUrl = o.SourceUrl,
+                }).ToList(),
+            };
         }).ToList();
 
         return new PaginatedResponseDto<NewsItemResponseDto>
@@ -184,8 +208,11 @@ public class FeedService : IFeedService
             .Where(p => !GalleryTitleDetector.IsGalleryTitle(p.ProgramName))
             .ToList();
 
-        var total = filteredPrograms.Count;
-        var rawItems = filteredPrograms
+        // FEAT-035: 転載重複まとめ（メモリでグループ化）
+        var groups = ArticleDeduplicator.GroupProgramItems(filteredPrograms);
+
+        var total = groups.Count;
+        var pageGroups = groups
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
@@ -194,17 +221,33 @@ public class FeedService : IFeedService
             .Where(o => oshiIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name);
 
-        var items = rawItems.Select(p => new ProgramAppearanceResponseDto
+        var items = pageGroups.Select(g =>
         {
-            Id = p.Id,
-            OshiId = p.OshiId,
-            OshiName = oshiNameMap.GetValueOrDefault(p.OshiId) ?? string.Empty,
-            ProgramName = p.ProgramName,
-            Broadcaster = p.Broadcaster,
-            AiredAt = p.AiredAt,
-            IsAiredAtEstimated = p.IsAiredAtEstimated,
-            SourceUrl = p.SourceUrl,
-            CollectedAt = p.CollectedAt,
+            var p = g.Representative;
+            var sourceName = !string.IsNullOrEmpty(p.SourceName)
+                ? p.SourceName
+                : ArticleDeduplicator.ExtractSourceNameFromTitle(p.ProgramName);
+            return new ProgramAppearanceResponseDto
+            {
+                Id = p.Id,
+                OshiId = p.OshiId,
+                OshiName = oshiNameMap.GetValueOrDefault(p.OshiId) ?? string.Empty,
+                ProgramName = p.ProgramName,
+                Broadcaster = p.Broadcaster,
+                AiredAt = p.AiredAt,
+                IsAiredAtEstimated = p.IsAiredAtEstimated,
+                SourceUrl = p.SourceUrl,
+                CollectedAt = p.CollectedAt,
+                SourceName = sourceName,
+                OtherSourceCount = g.Others.Count,
+                OtherSources = g.Others.Select(o => new OtherSourceDto
+                {
+                    SourceName = !string.IsNullOrEmpty(o.SourceName)
+                        ? o.SourceName
+                        : ArticleDeduplicator.ExtractSourceNameFromTitle(o.ProgramName),
+                    SourceUrl = o.SourceUrl,
+                }).ToList(),
+            };
         }).ToList();
 
         return new PaginatedResponseDto<ProgramAppearanceResponseDto>
