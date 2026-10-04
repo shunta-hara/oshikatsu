@@ -1,6 +1,9 @@
 name = "oshikatsu-scheduler"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
+# Cron Triggers 専用で HTTP の入口は使わないため、workers.dev の公開 URL を無効にする
+workers_dev = false
+preview_urls = false
 
 [triggers]
 crons = ["17 */2 * * *"]
