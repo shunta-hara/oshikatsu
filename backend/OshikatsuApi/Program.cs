@@ -94,6 +94,9 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 // 推し管理サービス
 builder.Services.AddScoped<IOshiService, OshiService>();
 
+// タレント正規化・検索・作成サービス
+builder.Services.AddScoped<ITalentService, TalentService>();
+
 // GitHub Actions workflow_dispatch サービス（シングルトン: IHttpClientFactory・ILogger に依存）
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IGitHubDispatchService, GitHubDispatchService>();
