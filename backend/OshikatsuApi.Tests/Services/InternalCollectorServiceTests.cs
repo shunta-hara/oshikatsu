@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OshikatsuApi.Data;
 using OshikatsuApi.DTOs;
 using OshikatsuApi.Entities;
+using OshikatsuApi.Exceptions;
 using OshikatsuApi.Services;
 using Xunit;
 
@@ -29,20 +30,22 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_ValidRequest_SavesNewsItem()
     {
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/1");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/1");
 
         await _sut.CreateNewsItemAsync(dto);
 
         var saved = await _db.NewsItems.FirstOrDefaultAsync();
         Assert.NotNull(saved);
         Assert.Equal("https://example.com/news/1", saved!.SourceUrl);
-        Assert.Equal(1, saved.OshiId);
+        Assert.Equal(1, saved.TalentId);
     }
 
     [Fact]
     public async Task CreateNewsItemAsync_ValidRequest_ReturnsDto()
     {
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/2");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/2");
 
         var result = await _sut.CreateNewsItemAsync(dto);
 
@@ -55,15 +58,26 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_WithPublishedAt_StoresActualDateNotEstimated()
     {
+        await AddTalentAsync(talentId: 1);
         var publishedAt = _now.AddHours(-2);
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/3",
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/3",
             publishedAt: publishedAt);
 
         await _sut.CreateNewsItemAsync(dto);
 
         var saved = await _db.NewsItems.FirstAsync();
-        Assert.Equal(publishedAt, saved.PublishedAt);
+        Assert.Equal(publishedAt.ToUniversalTime(), saved.PublishedAt);
         Assert.False(saved.IsPublishedAtEstimated);
+    }
+
+    // ── CreateNewsItemAsync: 異常系（talentId 未存在） ────────────────────────
+
+    [Fact]
+    public async Task CreateNewsItemAsync_TalentNotFound_ThrowsTalentNotFoundException()
+    {
+        var dto = BuildNewsDto(talentId: 999, sourceUrl: "https://example.com/news/notalent");
+
+        await Assert.ThrowsAsync<TalentNotFoundException>(() => _sut.CreateNewsItemAsync(dto));
     }
 
     // ── CreateNewsItemAsync: 公開日時推定 ────────────────────────────────────
@@ -71,14 +85,15 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_NullPublishedAt_UsesCollectedAtAndSetsEstimatedFlag()
     {
+        await AddTalentAsync(talentId: 1);
         var collectedAt = _now;
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/4",
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/4",
             publishedAt: null, collectedAt: collectedAt);
 
         await _sut.CreateNewsItemAsync(dto);
 
         var saved = await _db.NewsItems.FirstAsync();
-        Assert.Equal(collectedAt, saved.PublishedAt);
+        Assert.Equal(collectedAt.ToUniversalTime(), saved.PublishedAt);
         Assert.True(saved.IsPublishedAtEstimated);
     }
 
@@ -87,7 +102,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_DuplicateSourceUrl_DoesNotInsertNewRow()
     {
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/dup");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/dup");
 
         await _sut.CreateNewsItemAsync(dto);
         await _sut.CreateNewsItemAsync(dto);
@@ -99,7 +115,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_DuplicateSourceUrl_ReturnsDuplicateFlag()
     {
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/dup2");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/dup2");
 
         await _sut.CreateNewsItemAsync(dto);
         var result = await _sut.CreateNewsItemAsync(dto);
@@ -108,11 +125,13 @@ public class InternalCollectorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateNewsItemAsync_SameUrlDifferentOshi_InsertsBothRows()
+    public async Task CreateNewsItemAsync_SameUrlDifferentTalent_InsertsBothRows()
     {
+        await AddTalentAsync(talentId: 1);
+        await AddTalentAsync(talentId: 2);
         var url = "https://example.com/news/shared";
-        var dto1 = BuildNewsDto(oshiId: 1, sourceUrl: url);
-        var dto2 = BuildNewsDto(oshiId: 2, sourceUrl: url);
+        var dto1 = BuildNewsDto(talentId: 1, sourceUrl: url);
+        var dto2 = BuildNewsDto(talentId: 2, sourceUrl: url);
 
         await _sut.CreateNewsItemAsync(dto1);
         await _sut.CreateNewsItemAsync(dto2);
@@ -126,7 +145,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_ValidRequest_SavesProgram()
     {
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/1");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/1");
 
         await _sut.CreateProgramAppearanceAsync(dto);
 
@@ -139,7 +159,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_ValidRequest_ReturnsDto()
     {
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/2");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/2");
 
         var result = await _sut.CreateProgramAppearanceAsync(dto);
 
@@ -151,15 +172,26 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_WithAiredAt_StoresActualDateNotEstimated()
     {
+        await AddTalentAsync(talentId: 1);
         var airedAt = _now.AddHours(-3);
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/3",
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/3",
             airedAt: airedAt);
 
         await _sut.CreateProgramAppearanceAsync(dto);
 
         var saved = await _db.ProgramAppearances.FirstAsync();
-        Assert.Equal(airedAt, saved.AiredAt);
+        Assert.Equal(airedAt.ToUniversalTime(), saved.AiredAt);
         Assert.False(saved.IsAiredAtEstimated);
+    }
+
+    // ── CreateProgramAppearanceAsync: 異常系（talentId 未存在） ──────────────
+
+    [Fact]
+    public async Task CreateProgramAppearanceAsync_TalentNotFound_ThrowsTalentNotFoundException()
+    {
+        var dto = BuildProgramDto(talentId: 999, sourceUrl: "https://tv.example.com/prog/notalent");
+
+        await Assert.ThrowsAsync<TalentNotFoundException>(() => _sut.CreateProgramAppearanceAsync(dto));
     }
 
     // ── CreateProgramAppearanceAsync: 放送日時推定 ───────────────────────────
@@ -167,14 +199,15 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_NullAiredAt_UsesCollectedAtAndSetsEstimatedFlag()
     {
+        await AddTalentAsync(talentId: 1);
         var collectedAt = _now;
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/4",
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/4",
             airedAt: null, collectedAt: collectedAt);
 
         await _sut.CreateProgramAppearanceAsync(dto);
 
         var saved = await _db.ProgramAppearances.FirstAsync();
-        Assert.Equal(collectedAt, saved.AiredAt);
+        Assert.Equal(collectedAt.ToUniversalTime(), saved.AiredAt);
         Assert.True(saved.IsAiredAtEstimated);
     }
 
@@ -183,7 +216,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_DuplicateSourceUrl_DoesNotInsertNewRow()
     {
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/dup");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/dup");
 
         await _sut.CreateProgramAppearanceAsync(dto);
         await _sut.CreateProgramAppearanceAsync(dto);
@@ -195,7 +229,8 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_DuplicateSourceUrl_ReturnsDuplicateFlag()
     {
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/dup2");
+        await AddTalentAsync(talentId: 1);
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/dup2");
 
         await _sut.CreateProgramAppearanceAsync(dto);
         var result = await _sut.CreateProgramAppearanceAsync(dto);
@@ -208,10 +243,11 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_JstPublishedAt_NormalizesToUtc()
     {
+        await AddTalentAsync(talentId: 1);
         // JST (UTC+09:00) のオフセット付き公開日時を送ると UTC で保存される
         var jstOffset = TimeSpan.FromHours(9);
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset); // 2026-10-05T20:00:00+09:00
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/jst-pub",
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/jst-pub",
             publishedAt: jstTime, collectedAt: _now);
 
         await _sut.CreateNewsItemAsync(dto);
@@ -226,10 +262,11 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_JstCollectedAt_NormalizesToUtc()
     {
+        await AddTalentAsync(talentId: 1);
         // CollectedAt に JST オフセットが来ても UTC で保存される
         var jstOffset = TimeSpan.FromHours(9);
         var jstCollectedAt = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset);
-        var dto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/jst-col",
+        var dto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/jst-col",
             collectedAt: jstCollectedAt);
 
         await _sut.CreateNewsItemAsync(dto);
@@ -242,17 +279,19 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateNewsItemAsync_UtcAndJstEquivalent_StoresSameUtcInstant()
     {
+        await AddTalentAsync(talentId: 1);
+        await AddTalentAsync(talentId: 2);
         // UTC と JST の同じ瞬間を表す DateTimeOffset は同一の UTC 値として保存される
         var utcTime = new DateTimeOffset(2026, 10, 5, 11, 0, 0, TimeSpan.Zero);       // UTC
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9)); // JST (同じ瞬間)
 
-        var dtoUtc = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news/utc", publishedAt: utcTime);
-        var dtoJst = BuildNewsDto(oshiId: 2, sourceUrl: "https://example.com/news/jst", publishedAt: jstTime);
+        var dtoUtc = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news/utc", publishedAt: utcTime);
+        var dtoJst = BuildNewsDto(talentId: 2, sourceUrl: "https://example.com/news/jst", publishedAt: jstTime);
 
         await _sut.CreateNewsItemAsync(dtoUtc);
         await _sut.CreateNewsItemAsync(dtoJst);
 
-        var items = await _db.NewsItems.OrderBy(n => n.OshiId).ToListAsync();
+        var items = await _db.NewsItems.OrderBy(n => n.TalentId).ToListAsync();
         Assert.Equal(2, items.Count);
         // 両方とも同じ UTC 瞬間で保存されている
         Assert.Equal(items[0].PublishedAt!.Value.UtcDateTime, items[1].PublishedAt!.Value.UtcDateTime);
@@ -265,10 +304,11 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_JstAiredAt_NormalizesToUtc()
     {
+        await AddTalentAsync(talentId: 1);
         // JST (UTC+09:00) のオフセット付き放送日時を送ると UTC で保存される
         var jstOffset = TimeSpan.FromHours(9);
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset); // 2026-10-05T20:00:00+09:00
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/jst-aired",
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/jst-aired",
             airedAt: jstTime, collectedAt: _now);
 
         await _sut.CreateProgramAppearanceAsync(dto);
@@ -281,9 +321,10 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_JstCollectedAt_NormalizesToUtc()
     {
+        await AddTalentAsync(talentId: 1);
         var jstOffset = TimeSpan.FromHours(9);
         var jstCollectedAt = new DateTimeOffset(2026, 10, 5, 20, 0, 0, jstOffset);
-        var dto = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/jst-col",
+        var dto = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/jst-col",
             collectedAt: jstCollectedAt);
 
         await _sut.CreateProgramAppearanceAsync(dto);
@@ -296,16 +337,18 @@ public class InternalCollectorServiceTests : IDisposable
     [Fact]
     public async Task CreateProgramAppearanceAsync_UtcAndJstEquivalent_StoresSameUtcInstant()
     {
+        await AddTalentAsync(talentId: 1);
+        await AddTalentAsync(talentId: 2);
         var utcTime = new DateTimeOffset(2026, 10, 5, 11, 0, 0, TimeSpan.Zero);
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9));
 
-        var dtoUtc = BuildProgramDto(oshiId: 1, sourceUrl: "https://tv.example.com/prog/utc", airedAt: utcTime);
-        var dtoJst = BuildProgramDto(oshiId: 2, sourceUrl: "https://tv.example.com/prog/jst", airedAt: jstTime);
+        var dtoUtc = BuildProgramDto(talentId: 1, sourceUrl: "https://tv.example.com/prog/utc", airedAt: utcTime);
+        var dtoJst = BuildProgramDto(talentId: 2, sourceUrl: "https://tv.example.com/prog/jst", airedAt: jstTime);
 
         await _sut.CreateProgramAppearanceAsync(dtoUtc);
         await _sut.CreateProgramAppearanceAsync(dtoJst);
 
-        var items = await _db.ProgramAppearances.OrderBy(p => p.OshiId).ToListAsync();
+        var items = await _db.ProgramAppearances.OrderBy(p => p.TalentId).ToListAsync();
         Assert.Equal(2, items.Count);
         Assert.Equal(items[0].AiredAt!.Value.UtcDateTime, items[1].AiredAt!.Value.UtcDateTime);
         Assert.Equal(TimeSpan.Zero, items[0].AiredAt!.Value.Offset);
@@ -315,14 +358,11 @@ public class InternalCollectorServiceTests : IDisposable
     // ── GetAllOshisAsync: 正常系 ─────────────────────────────────────────────
 
     [Fact]
-    public async Task GetAllOshisAsync_WithMultipleOshis_ReturnsAll()
+    public async Task GetAllOshisAsync_WithMultipleTalents_ReturnsRegisteredOnes()
     {
-        var now = DateTime.UtcNow;
-        _db.Oshis.AddRange(
-            new OshikatsuApi.Entities.Oshi { UserId = 1, Name = "推しA", CreatedAt = now, UpdatedAt = now },
-            new OshikatsuApi.Entities.Oshi { UserId = 2, Name = "推しB", CreatedAt = now, UpdatedAt = now }
-        );
-        await _db.SaveChangesAsync();
+        // talentId=1 はユーザー登録あり、talentId=2 は登録なし
+        await AddTalentWithUserOshiAsync(displayName: "推しA", userId: 1);
+        await AddTalentWithUserOshiAsync(displayName: "推しB", userId: 2);
 
         var result = await _sut.GetAllOshisAsync();
 
@@ -330,30 +370,41 @@ public class InternalCollectorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task GetAllOshisAsync_ReturnsCorrectIdAndName()
+    public async Task GetAllOshisAsync_ReturnsCorrectTalentIdAndName()
     {
-        var now = DateTime.UtcNow;
-        _db.Oshis.Add(new OshikatsuApi.Entities.Oshi { UserId = 1, Name = "鈴木一郎", CreatedAt = now, UpdatedAt = now });
-        await _db.SaveChangesAsync();
+        var talent = await AddTalentWithUserOshiAsync(displayName: "鈴木一郎", userId: 1);
 
         var result = await _sut.GetAllOshisAsync();
 
         Assert.Single(result);
         Assert.Equal("鈴木一郎", result[0].Name);
-        Assert.True(result[0].Id > 0);
+        Assert.Equal(talent.Id, result[0].TalentId);
     }
 
     [Fact]
-    public async Task GetAllOshisAsync_SpansAllUsers_ReturnsOshisFromAllUsers()
+    public async Task GetAllOshisAsync_TalentWithoutUserOshi_IsNotReturned()
     {
-        var now = DateTime.UtcNow;
-        // ユーザー1、2、3 それぞれに1件ずつ
-        _db.Oshis.AddRange(
-            new OshikatsuApi.Entities.Oshi { UserId = 1, Name = "推し1", CreatedAt = now, UpdatedAt = now },
-            new OshikatsuApi.Entities.Oshi { UserId = 2, Name = "推し2", CreatedAt = now, UpdatedAt = now },
-            new OshikatsuApi.Entities.Oshi { UserId = 3, Name = "推し3", CreatedAt = now, UpdatedAt = now }
-        );
+        // UserOshi なしで Talent だけ作成
+        _db.Talents.Add(new Talent
+        {
+            DisplayName = "未登録タレント",
+            NormalizedName = "未登録タレント",
+            CreatedAt = DateTime.UtcNow,
+        });
         await _db.SaveChangesAsync();
+
+        var result = await _sut.GetAllOshisAsync();
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetAllOshisAsync_SpansAllUsers_ReturnsTalentsFromAllUsers()
+    {
+        // ユーザー1、2、3 それぞれに1タレントずつ登録
+        await AddTalentWithUserOshiAsync(displayName: "推し1", userId: 1);
+        await AddTalentWithUserOshiAsync(displayName: "推し2", userId: 2);
+        await AddTalentWithUserOshiAsync(displayName: "推し3", userId: 3);
 
         var result = await _sut.GetAllOshisAsync();
 
@@ -367,7 +418,7 @@ public class InternalCollectorServiceTests : IDisposable
     // ── GetAllOshisAsync: 境界値 ─────────────────────────────────────────────
 
     [Fact]
-    public async Task GetAllOshisAsync_NoOshis_ReturnsEmptyList()
+    public async Task GetAllOshisAsync_NoTalents_ReturnsEmptyList()
     {
         var result = await _sut.GetAllOshisAsync();
 
@@ -378,26 +429,28 @@ public class InternalCollectorServiceTests : IDisposable
     // ── CreateProgramAppearanceAsync: FEAT-024 ニュース URL との重複 ──────────
 
     [Fact]
-    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameOshi_ReturnsWasDuplicateTrue()
+    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameTalent_ReturnsWasDuplicateTrue()
     {
+        await AddTalentAsync(talentId: 1);
         // 事前に同 URL のニュースを保存
-        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/both");
+        var newsDto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/both");
         await _sut.CreateNewsItemAsync(newsDto);
 
         // 同 URL で番組を登録しようとする
-        var progDto = BuildProgramDto(oshiId: 1, sourceUrl: "https://example.com/both");
+        var progDto = BuildProgramDto(talentId: 1, sourceUrl: "https://example.com/both");
         var result = await _sut.CreateProgramAppearanceAsync(progDto);
 
         Assert.True(result.WasDuplicate);
     }
 
     [Fact]
-    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameOshi_DoesNotSaveProgram()
+    public async Task CreateProgramAppearanceAsync_UrlAlreadyInNewsForSameTalent_DoesNotSaveProgram()
     {
-        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/news-dup");
+        await AddTalentAsync(talentId: 1);
+        var newsDto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/news-dup");
         await _sut.CreateNewsItemAsync(newsDto);
 
-        var progDto = BuildProgramDto(oshiId: 1, sourceUrl: "https://example.com/news-dup");
+        var progDto = BuildProgramDto(talentId: 1, sourceUrl: "https://example.com/news-dup");
         await _sut.CreateProgramAppearanceAsync(progDto);
 
         var count = await _db.ProgramAppearances.CountAsync();
@@ -405,14 +458,16 @@ public class InternalCollectorServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CreateProgramAppearanceAsync_UrlInNewsOfDifferentOshi_SavesProgram()
+    public async Task CreateProgramAppearanceAsync_UrlInNewsOfDifferentTalent_SavesProgram()
     {
-        // 別の推しのニュースと URL が同じでも保存される
-        var newsDto = BuildNewsDto(oshiId: 1, sourceUrl: "https://example.com/cross");
+        await AddTalentAsync(talentId: 1);
+        await AddTalentAsync(talentId: 2);
+        // talentId=1 のニュースと URL が同じでも talentId=2 の番組は保存される
+        var newsDto = BuildNewsDto(talentId: 1, sourceUrl: "https://example.com/cross");
         await _sut.CreateNewsItemAsync(newsDto);
 
-        // oshi=2 の番組（oshi=1 のニュースとは別推し）
-        var progDto = BuildProgramDto(oshiId: 2, sourceUrl: "https://example.com/cross");
+        // talentId=2 の番組（talentId=1 のニュースとは別タレント）
+        var progDto = BuildProgramDto(talentId: 2, sourceUrl: "https://example.com/cross");
         var result = await _sut.CreateProgramAppearanceAsync(progDto);
 
         Assert.False(result.WasDuplicate);
@@ -421,13 +476,48 @@ public class InternalCollectorServiceTests : IDisposable
 
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
+    /// <summary>指定 ID で Talent レコードのみを作成する（UserOshi なし）</summary>
+    private async Task AddTalentAsync(int talentId)
+    {
+        _db.Talents.Add(new Talent
+        {
+            Id = talentId,
+            DisplayName = $"タレント{talentId}",
+            NormalizedName = $"タレント{talentId}",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Talent + UserOshi をセットで作成する（GetAllOshisAsync テスト用）</summary>
+    private async Task<Talent> AddTalentWithUserOshiAsync(string displayName, int userId)
+    {
+        var talent = new Talent
+        {
+            DisplayName = displayName,
+            NormalizedName = displayName.ToLowerInvariant().Replace(" ", ""),
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync(); // talent.Id が確定する
+
+        _db.UserOshis.Add(new UserOshi
+        {
+            UserId = userId,
+            TalentId = talent.Id,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await _db.SaveChangesAsync();
+        return talent;
+    }
+
     private CreateNewsItemRequestDto BuildNewsDto(
-        int oshiId,
+        int talentId,
         string sourceUrl,
         DateTimeOffset? publishedAt = null,
         DateTimeOffset? collectedAt = null) => new()
         {
-            OshiId = oshiId,
+            TalentId = talentId,
             Title = "テストニュース",
             Summary = "テスト本文要約",
             SourceUrl = sourceUrl,
@@ -436,12 +526,12 @@ public class InternalCollectorServiceTests : IDisposable
         };
 
     private CreateProgramAppearanceRequestDto BuildProgramDto(
-        int oshiId,
+        int talentId,
         string sourceUrl,
         DateTimeOffset? airedAt = null,
         DateTimeOffset? collectedAt = null) => new()
         {
-            OshiId = oshiId,
+            TalentId = talentId,
             ProgramName = "テスト番組",
             Broadcaster = "テストTV",
             AiredAt = airedAt,

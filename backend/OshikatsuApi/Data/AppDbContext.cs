@@ -141,7 +141,8 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.Oshi)
                   .WithMany(o => o.NewsItems)
                   .HasForeignKey(e => e.OshiId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .IsRequired(false);
 
             entity.HasOne(e => e.Talent)
                   .WithMany(t => t.NewsItems)
@@ -184,7 +185,8 @@ public class AppDbContext : DbContext
             entity.HasOne(e => e.Oshi)
                   .WithMany(o => o.ProgramAppearances)
                   .HasForeignKey(e => e.OshiId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Cascade)
+                  .IsRequired(false);
 
             entity.HasOne(e => e.Talent)
                   .WithMany(t => t.ProgramAppearances)

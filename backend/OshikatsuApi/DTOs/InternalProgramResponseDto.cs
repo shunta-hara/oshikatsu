@@ -4,7 +4,7 @@ namespace OshikatsuApi.DTOs;
 public class InternalProgramResponseDto
 {
     public int Id { get; set; }
-    public int OshiId { get; set; }
+    public int TalentId { get; set; }
     public string ProgramName { get; set; } = null!;
     public string? Broadcaster { get; set; }
     public DateTimeOffset? AiredAt { get; set; }

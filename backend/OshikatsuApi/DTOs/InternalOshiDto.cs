@@ -1,11 +1,11 @@
 namespace OshikatsuApi.DTOs;
 
-/// <summary>collector 内部 API 用: 推し情報レスポンス</summary>
+/// <summary>collector 内部 API 用: タレント情報レスポンス（GET /api/v1/internal/oshis）</summary>
 public class InternalOshiDto
 {
-    /// <summary>推しの ID</summary>
-    public int Id { get; set; }
+    /// <summary>タレントの ID（talents.id）</summary>
+    public int TalentId { get; set; }
 
-    /// <summary>推しの名前</summary>
+    /// <summary>タレントの表示名</summary>
     public string Name { get; set; } = null!;
 }

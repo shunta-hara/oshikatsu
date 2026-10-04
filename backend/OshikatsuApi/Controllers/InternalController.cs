@@ -31,24 +31,33 @@ public class InternalController : ControllerBase
 
     /// <summary>ニュースアイテムを登録する（重複ソースURLは無視）</summary>
     /// <remarks>
-    /// 同一の oshiId + sourceUrl の組み合わせが既に存在する場合、
+    /// 同一の talentId + sourceUrl の組み合わせが既に存在する場合、
     /// 409 を返さずに既存レコードを返す（冪等）。
     /// </remarks>
     /// <response code="200">登録成功（または既存重複のため無視）</response>
     /// <response code="400">バリデーションエラー</response>
     /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した talentId が存在しない</response>
     [HttpPost("news")]
     [ProducesResponseType(typeof(InternalNewsResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateNews([FromBody] CreateNewsItemRequestDto dto)
     {
-        var result = await _collectorService.CreateNewsItemAsync(dto);
-        return Ok(result);
+        try
+        {
+            var result = await _collectorService.CreateNewsItemAsync(dto);
+            return Ok(result);
+        }
+        catch (TalentNotFoundException)
+        {
+            return NotFound(new MessageResponseDto { Message = "指定した talentId が見つかりません。" });
+        }
     }
 
-    /// <summary>全推し一覧を取得する（collector が収集対象を把握するために使用）</summary>
-    /// <response code="200">推し一覧</response>
+    /// <summary>タレント一覧を取得する（1人以上のユーザーが登録しているタレントのみ）</summary>
+    /// <response code="200">タレント一覧</response>
     /// <response code="401">API キーなし・不正</response>
     [HttpGet("oshis")]
     [ProducesResponseType(typeof(IReadOnlyList<InternalOshiDto>), StatusCodes.Status200OK)]
@@ -61,31 +70,40 @@ public class InternalController : ControllerBase
 
     /// <summary>出演番組情報を登録する（重複ソースURLは無視）</summary>
     /// <remarks>
-    /// 同一の oshiId + sourceUrl の組み合わせが既に存在する場合、
+    /// 同一の talentId + sourceUrl の組み合わせが既に存在する場合、
     /// 409 を返さずに既存レコードを返す（冪等）。
     /// </remarks>
     /// <response code="200">登録成功（または既存重複のため無視）</response>
     /// <response code="400">バリデーションエラー</response>
     /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した talentId が存在しない</response>
     [HttpPost("programs")]
     [ProducesResponseType(typeof(InternalProgramResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> CreateProgram([FromBody] CreateProgramAppearanceRequestDto dto)
     {
-        var result = await _collectorService.CreateProgramAppearanceAsync(dto);
-        return Ok(result);
+        try
+        {
+            var result = await _collectorService.CreateProgramAppearanceAsync(dto);
+            return Ok(result);
+        }
+        catch (TalentNotFoundException)
+        {
+            return NotFound(new MessageResponseDto { Message = "指定した talentId が見つかりません。" });
+        }
     }
 
-    /// <summary>ニュースアイテムを一括登録する（重複ソースURL・同推しのニュース既存URLは無視）</summary>
+    /// <summary>ニュースアイテムを一括登録する（重複ソースURL・同タレントのニュース既存URLは無視）</summary>
     /// <remarks>
     /// <para>リクエスト内で重複する sourceUrl は最初の出現のみ保存する。</para>
-    /// <para>同一の oshiId + sourceUrl が既に存在する場合もスキップされる。</para>
+    /// <para>同一の talentId + sourceUrl が既に存在する場合もスキップされる。</para>
     /// </remarks>
     /// <response code="200">一括登録結果（受信件数・保存件数・スキップ件数）</response>
     /// <response code="400">items が空または200件超、必須項目不足</response>
     /// <response code="401">API キーなし・不正</response>
-    /// <response code="404">指定した oshiId が存在しない</response>
+    /// <response code="404">指定した talentId が存在しない</response>
     [HttpPost("news/batch")]
     [ProducesResponseType(typeof(BatchResultResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
@@ -103,21 +121,21 @@ public class InternalController : ControllerBase
             var result = await _collectorService.BatchCreateNewsItemsAsync(dto);
             return Ok(result);
         }
-        catch (OshiNotFoundException)
+        catch (TalentNotFoundException)
         {
-            return NotFound(new MessageResponseDto { Message = "指定した oshiId が見つかりません。" });
+            return NotFound(new MessageResponseDto { Message = "指定した talentId が見つかりません。" });
         }
     }
 
-    /// <summary>出演番組情報を一括登録する（重複ソースURL・同推しのニュース既存URLは無視）</summary>
+    /// <summary>出演番組情報を一括登録する（重複ソースURL・同タレントのニュース既存URLは無視）</summary>
     /// <remarks>
     /// <para>リクエスト内で重複する sourceUrl は最初の出現のみ保存する。</para>
-    /// <para>同一の oshiId + sourceUrl が既に番組または同推しのニュースに存在する場合もスキップされる（FEAT-024）。</para>
+    /// <para>同一の talentId + sourceUrl が既に番組または同タレントのニュースに存在する場合もスキップされる（FEAT-024）。</para>
     /// </remarks>
     /// <response code="200">一括登録結果（受信件数・保存件数・スキップ件数）</response>
     /// <response code="400">items が空または200件超、必須項目不足</response>
     /// <response code="401">API キーなし・不正</response>
-    /// <response code="404">指定した oshiId が存在しない</response>
+    /// <response code="404">指定した talentId が存在しない</response>
     [HttpPost("programs/batch")]
     [ProducesResponseType(typeof(BatchResultResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status400BadRequest)]
@@ -135,9 +153,9 @@ public class InternalController : ControllerBase
             var result = await _collectorService.BatchCreateProgramAppearancesAsync(dto);
             return Ok(result);
         }
-        catch (OshiNotFoundException)
+        catch (TalentNotFoundException)
         {
-            return NotFound(new MessageResponseDto { Message = "指定した oshiId が見つかりません。" });
+            return NotFound(new MessageResponseDto { Message = "指定した talentId が見つかりません。" });
         }
     }
 

@@ -5,9 +5,9 @@ namespace OshikatsuApi.DTOs;
 /// <summary>一括登録API: ニュース一括登録リクエスト</summary>
 public class BatchCreateNewsRequestDto
 {
-    /// <summary>紐づく推しID</summary>
+    /// <summary>紐づくタレントID（talents.id）</summary>
     [Required]
-    public int OshiId { get; set; }
+    public int TalentId { get; set; }
 
     /// <summary>登録するニュースアイテムのリスト（1〜200件）</summary>
     [Required]

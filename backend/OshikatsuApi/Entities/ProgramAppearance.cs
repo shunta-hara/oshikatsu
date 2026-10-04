@@ -7,8 +7,8 @@ public class ProgramAppearance
 {
     public int Id { get; set; }
 
-    /// <summary>紐づく推しID（後方互換のため残存）</summary>
-    public int OshiId { get; set; }
+    /// <summary>紐づく推しID（後方互換のため残存。FEAT-040 以降に collector 経由で登録されたアイテムは null）</summary>
+    public int? OshiId { get; set; }
 
     /// <summary>紐づくタレントID（talents テーブルへの外部キー）</summary>
     public int? TalentId { get; set; }

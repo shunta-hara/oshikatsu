@@ -4,7 +4,7 @@ namespace OshikatsuApi.DTOs;
 public class InternalNewsResponseDto
 {
     public int Id { get; set; }
-    public int OshiId { get; set; }
+    public int TalentId { get; set; }
     public string Title { get; set; } = null!;
     public string SourceUrl { get; set; } = null!;
     public DateTimeOffset? PublishedAt { get; set; }

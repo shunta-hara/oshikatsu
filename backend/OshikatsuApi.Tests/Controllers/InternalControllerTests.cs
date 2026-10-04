@@ -12,6 +12,7 @@ public class InternalControllerTests
 {
     private readonly IInternalCollectorService _service;
     private readonly ICollectorJobLogService _jobLogService;
+    private readonly INewsCleanupService _cleanupService;
     private readonly InternalController _sut;
     private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
 
@@ -19,7 +20,8 @@ public class InternalControllerTests
     {
         _service = Substitute.For<IInternalCollectorService>();
         _jobLogService = Substitute.For<ICollectorJobLogService>();
-        _sut = new InternalController(_service, _jobLogService);
+        _cleanupService = Substitute.For<INewsCleanupService>();
+        _sut = new InternalController(_service, _jobLogService, _cleanupService);
     }
 
     // ── POST /api/v1/internal/news: 正常系 ──────────────────────────────────
@@ -77,6 +79,21 @@ public class InternalControllerTests
         await _service.Received(1).CreateNewsItemAsync(dto);
     }
 
+    // ── POST /api/v1/internal/news: 異常系（talentId 未存在） ────────────────
+
+    [Fact]
+    public async Task CreateNews_TalentNotFound_Returns404()
+    {
+        var dto = BuildNewsRequest();
+        _service.CreateNewsItemAsync(dto)
+            .Returns<InternalNewsResponseDto>(_ => throw new OshikatsuApi.Exceptions.TalentNotFoundException());
+
+        var result = await _sut.CreateNews(dto);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+
     // ── POST /api/v1/internal/programs: 正常系 ──────────────────────────────
 
     [Fact]
@@ -132,6 +149,21 @@ public class InternalControllerTests
         await _service.Received(1).CreateProgramAppearanceAsync(dto);
     }
 
+    // ── POST /api/v1/internal/programs: 異常系（talentId 未存在） ────────────
+
+    [Fact]
+    public async Task CreateProgram_TalentNotFound_Returns404()
+    {
+        var dto = BuildProgramRequest();
+        _service.CreateProgramAppearanceAsync(dto)
+            .Returns<InternalProgramResponseDto>(_ => throw new OshikatsuApi.Exceptions.TalentNotFoundException());
+
+        var result = await _sut.CreateProgram(dto);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+
     // ── GET /api/v1/internal/oshis: 正常系 ──────────────────────────────────
 
     [Fact]
@@ -150,8 +182,8 @@ public class InternalControllerTests
     {
         var oshis = new List<InternalOshiDto>
         {
-            new() { Id = 1, Name = "推しA" },
-            new() { Id = 2, Name = "推しB" },
+            new() { TalentId = 1, Name = "推しA" },
+            new() { TalentId = 2, Name = "推しB" },
         };
         _service.GetAllOshisAsync().Returns(oshis);
 
@@ -161,7 +193,7 @@ public class InternalControllerTests
         var body = Assert.IsAssignableFrom<IReadOnlyList<InternalOshiDto>>(ok.Value);
         Assert.Equal(2, body.Count);
         Assert.Equal("推しA", body[0].Name);
-        Assert.Equal(1, body[0].Id);
+        Assert.Equal(1, body[0].TalentId);
     }
 
     // ── GET /api/v1/internal/oshis: 境界値 ──────────────────────────────────
@@ -272,7 +304,7 @@ public class InternalControllerTests
 
     private CreateNewsItemRequestDto BuildNewsRequest() => new()
     {
-        OshiId = 1,
+        TalentId = 1,
         Title = "テストニュース",
         SourceUrl = "https://example.com/news/1",
         CollectedAt = _now,
@@ -281,7 +313,7 @@ public class InternalControllerTests
     private InternalNewsResponseDto BuildNewsResponse(bool wasDuplicate) => new()
     {
         Id = 1,
-        OshiId = 1,
+        TalentId = 1,
         Title = "テストニュース",
         SourceUrl = "https://example.com/news/1",
         PublishedAt = _now,
@@ -293,7 +325,7 @@ public class InternalControllerTests
 
     private CreateProgramAppearanceRequestDto BuildProgramRequest() => new()
     {
-        OshiId = 1,
+        TalentId = 1,
         ProgramName = "テスト番組",
         SourceUrl = "https://tv.example.com/prog/1",
         CollectedAt = _now,
@@ -302,7 +334,7 @@ public class InternalControllerTests
     private InternalProgramResponseDto BuildProgramResponse(bool wasDuplicate) => new()
     {
         Id = 1,
-        OshiId = 1,
+        TalentId = 1,
         ProgramName = "テスト番組",
         SourceUrl = "https://tv.example.com/prog/1",
         CollectedAt = _now,
