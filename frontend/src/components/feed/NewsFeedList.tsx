@@ -10,13 +10,18 @@ import { BookmarkButton } from "./BookmarkButton";
 interface NewsFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しのニュースを表示する */
   oshiId?: number;
+  /** 取得完了後に totalCount を通知するコールバック */
+  onTotalCountChange?: (count: number) => void;
 }
 
 /**
  * ログインユーザーの推し全員分（または特定の推し）のニュース一覧を表示するコンポーネント。
  * 各アイテムをカード形式で表示し、タイトル・推し名・出典・掲載日・ブックマークを一目で確認できる。
  */
-export function NewsFeedList({ oshiId }: NewsFeedListProps) {
+export function NewsFeedList({
+  oshiId,
+  onTotalCountChange,
+}: NewsFeedListProps) {
   const [data, setData] = useState<NewsPaginatedResponse | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +47,7 @@ export function NewsFeedList({ oshiId }: NewsFeedListProps) {
           dateTo,
         );
         setData(result);
+        onTotalCountChange?.(result.totalCount);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.message);

@@ -16,10 +16,14 @@ import { OshiCardList } from "../components/dashboard/OshiCardList";
 import type { OshiResponse } from "../types/oshi";
 import type { OshiDashboardCard } from "../types/dashboard";
 
+/** アクティブなフィードタブ（狭い画面でのタブ切り替え用） */
+type FeedTab = "news" | "programs";
+
 /**
  * ダッシュボードページ（認証済みユーザー専用）。
  * 960px 以上ではサイドバー（推し管理・収集ジョブ）とメイン（フィード）の2カラムレイアウト。
- * 375px ではシングルカラムに折り返す。
+ * 1024px 以上ではフィード内のニュースと出演情報が2列横並び。
+ * 375px〜1023px ではフィード内をタブで切り替える。
  */
 export function DashboardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -37,6 +41,13 @@ export function DashboardPage() {
 
   // 未読件数（ページ開くと取得→表示後にリセット）
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // フィードの件数（タブ・見出しに表示する）
+  const [newsCount, setNewsCount] = useState(0);
+  const [programsCount, setProgramsCount] = useState(0);
+
+  // 狭い画面でのアクティブタブ
+  const [activeTab, setActiveTab] = useState<FeedTab>("news");
 
   // URLクエリパラメータから選択中の推しIDを読み取る
   const selectedOshiId = (() => {
@@ -116,6 +127,9 @@ export function DashboardPage() {
   };
 
   const handleOshiFilterChange = (oshiId: number | null) => {
+    // フィルタ変更時はカウントをリセット（再取得後に更新される）
+    setNewsCount(0);
+    setProgramsCount(0);
     if (oshiId === null) {
       setSearchParams({});
     } else {
@@ -126,7 +140,7 @@ export function DashboardPage() {
   return (
     <>
       <NavBar />
-      <main className="page-content">
+      <main className="page-content page-content--wide">
         <h1 className="dashboard-heading">
           oshikatsu ダッシュボード
           <NotificationBadge count={unreadCount} />
@@ -215,28 +229,70 @@ export function DashboardPage() {
                 onChange={handleOshiFilterChange}
               />
 
-              <section aria-labelledby="news-section-title">
-                <h3 id="news-section-title" className="section-card__subtitle">
-                  ニュース
-                </h3>
-                <NewsFeedList
-                  key={String(selectedOshiId)}
-                  oshiId={selectedOshiId ?? undefined}
-                />
-              </section>
-
-              <section aria-labelledby="programs-section-title">
-                <h3
-                  id="programs-section-title"
-                  className="section-card__subtitle"
+              {/* タブナビ（狭い画面のみ表示、CSS で切り替え） */}
+              <div
+                role="tablist"
+                aria-label="フィード切り替え"
+                className="feed-tabs"
+              >
+                <button
+                  role="tab"
+                  id="feed-tab-news"
+                  aria-selected={activeTab === "news"}
+                  aria-controls="feed-tabpanel-news"
+                  className={`feed-tab${activeTab === "news" ? " feed-tab--active" : ""}`}
+                  onClick={() => setActiveTab("news")}
+                  type="button"
                 >
-                  出演情報
-                </h3>
-                <ProgramFeedList
-                  key={String(selectedOshiId)}
-                  oshiId={selectedOshiId ?? undefined}
-                />
-              </section>
+                  ニュース（{newsCount}件）
+                </button>
+                <button
+                  role="tab"
+                  id="feed-tab-programs"
+                  aria-selected={activeTab === "programs"}
+                  aria-controls="feed-tabpanel-programs"
+                  className={`feed-tab${activeTab === "programs" ? " feed-tab--active" : ""}`}
+                  onClick={() => setActiveTab("programs")}
+                  type="button"
+                >
+                  出演情報（{programsCount}件）
+                </button>
+              </div>
+
+              {/* 2カラム表示 ─ 1024px以上では横並び、未満では縦積み＋タブ連動 */}
+              <div className="feed-two-col">
+                <div
+                  id="feed-tabpanel-news"
+                  role="tabpanel"
+                  aria-labelledby="feed-tab-news"
+                  className={`feed-col${activeTab !== "news" ? " feed-col--tab-hidden" : ""}`}
+                >
+                  <h3 className="feed-col__heading">
+                    ニュース（{newsCount}件）
+                  </h3>
+                  <NewsFeedList
+                    key={String(selectedOshiId)}
+                    oshiId={selectedOshiId ?? undefined}
+                    onTotalCountChange={setNewsCount}
+                  />
+                </div>
+
+                <div
+                  id="feed-tabpanel-programs"
+                  role="tabpanel"
+                  aria-labelledby="feed-tab-programs"
+                  className={`feed-col${activeTab !== "programs" ? " feed-col--tab-hidden" : ""}`}
+                >
+                  <h3 className="feed-col__heading">
+                    出演情報（{programsCount}件）
+                  </h3>
+                  <ProgramFeedList
+                    key={String(selectedOshiId)}
+                    oshiId={selectedOshiId ?? undefined}
+                    onTotalCountChange={setProgramsCount}
+                  />
+                </div>
+              </div>
             </section>
           </div>
         </div>

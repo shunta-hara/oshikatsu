@@ -5,6 +5,22 @@ metadata:
   type: project
 ---
 
+Sprint 29 評価：合格（1回目）。233/233 全テスト通過。FEAT-032/031(frontend) すべて確認済み。
+
+**Why:** Sprint 29 は FEAT-032（ニュース/出演情報 2カラムレイアウト）・FEAT-031 frontend（ブックマーク絞り込みUI）。feed-two-col が 1024px+ で2列グリッド（computed: 453px 453px）、<1024px でタブ切り替え。role="tablist"/role="tab"/aria-selected 完備。
+
+**How to apply:** Sprint 29 合格。次は Sprint 30（推しごとの番組表検索リンク FEAT-033）。
+
+---
+
+Sprint 28 評価：合格（1回目）。417/417 全テスト通過。FEAT-029/030/031 すべて確認済み。
+
+**Why:** Sprint 28 は FEAT-029（掲載日降順）・FEAT-030（画像箱除外）・FEAT-031（ブックマーク絞り込み）。GalleryTitleDetector.cs（新規）をメモリフィルタとして利用。FeedService は全件 ToListAsync() 後にメモリフィルタ → ページングする設計（将来パフォーマンス課題だが仕様外）。
+
+**How to apply:** Sprint 28 合格。次は Sprint 29（FEAT-032 2カラムレイアウト）。
+
+---
+
 Sprint 27 評価：合格（2回目）。219/219 全テスト通過・ビルド正常。OshiCard.tsx の FEAT-024 表記変更漏れ修正確認済み。
 
 **Why:** Sprint 27 は FEAT-028 Sprint B（ダッシュボード・ブックマーク一覧のカード型レイアウト）。1回目は OshiCard.tsx「最新番組」「番組情報なし」が未修正で不合格。2回目で4箇所すべて「出演情報」に修正・テスト期待値も追随更新済み。

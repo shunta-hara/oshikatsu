@@ -426,4 +426,62 @@ describe("DashboardPage", () => {
       expect(screen.getAllByRole("alert").length).toBeGreaterThan(0);
     });
   });
+
+  // --- フィード2カラム / タブ（FEAT-032） ---
+  it("フィード切り替えの tablist が表示される", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("tablist", { name: "フィード切り替え" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("ニュースタブが aria-selected=true でデフォルト選択されている", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      const newsTab = screen.getByRole("tab", { name: /ニュース/ });
+      expect(newsTab).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  it("出演情報タブが aria-selected=false でデフォルト非選択になっている", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      const programsTab = screen.getByRole("tab", { name: /出演情報/ });
+      expect(programsTab).toHaveAttribute("aria-selected", "false");
+    });
+  });
+
+  it("出演情報タブをクリックすると aria-selected が切り替わる", async () => {
+    const user = userEvent.setup();
+    renderWithProvider();
+
+    await waitFor(() => {
+      expect(screen.getByRole("tablist")).toBeInTheDocument();
+    });
+
+    const programsTab = screen.getByRole("tab", { name: /出演情報/ });
+    await user.click(programsTab);
+
+    await waitFor(() => {
+      expect(programsTab).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByRole("tab", { name: /ニュース/ })).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
+    });
+  });
+
+  it("ニュースと出演情報の tabpanel が両方レンダリングされている", async () => {
+    renderWithProvider();
+
+    await waitFor(() => {
+      const panels = screen.getAllByRole("tabpanel");
+      expect(panels).toHaveLength(2);
+    });
+  });
 });

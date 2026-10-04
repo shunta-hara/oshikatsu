@@ -144,6 +144,11 @@ a:hover {
   box-sizing: border-box;
 }
 
+/* 2カラムフィードを含むページ（ダッシュボード）向けに最大幅を拡張する */
+.page-content--wide {
+  max-width: 1280px;
+}
+
 @media (max-width: 480px) {
   .page-content {
     padding: var(--space-4) var(--space-3);
@@ -942,4 +947,93 @@ textarea:disabled {
   font-weight: 700;
   color: var(--color-text);
   margin-bottom: var(--space-5);
+}
+
+/* ================================================================
+   フィード 2カラムレイアウト（FEAT-032）
+   ================================================================ */
+
+/* タブナビ ─ デフォルト非表示、狭い画面で表示 */
+.feed-tabs {
+  display: none;
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border-bottom: 2px solid var(--color-border);
+  gap: 0;
+}
+
+/* タブボタン（ベースの button スタイルを上書き） */
+.feed-tab {
+  padding: var(--space-2) var(--space-5);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.feed-tab:hover:not(:disabled) {
+  color: var(--color-accent-strong);
+  background: transparent;
+  border-color: var(--color-accent);
+}
+
+.feed-tab--active,
+.feed-tab[aria-selected="true"] {
+  color: var(--color-accent-strong);
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.feed-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* 2カラムグリッド ─ 1024px 以上で有効 */
+.feed-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+  margin-top: var(--space-4);
+}
+
+/* 各列の見出し */
+.feed-col__heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent-strong);
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  letter-spacing: 0.01em;
+}
+
+/* 狭い画面（< 1024px）ではタブモードに切り替える */
+@media (max-width: 1023px) {
+  .feed-tabs {
+    display: flex;
+  }
+
+  .feed-two-col {
+    grid-template-columns: 1fr;
+    margin-top: 0;
+  }
+
+  /* タブで非アクティブな列を非表示 */
+  .feed-col--tab-hidden {
+    display: none;
+  }
+
+  /* 見出しはタブに表示されるため列内では不要 */
+  .feed-col__heading {
+    display: none;
+  }
 }

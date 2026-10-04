@@ -11,13 +11,18 @@ import { DateRangeFilter } from "./DateRangeFilter";
 interface ProgramFeedListProps {
   /** 絞り込む推しのID。未指定の場合は全推しの出演情報を表示する */
   oshiId?: number;
+  /** 取得完了後に totalCount を通知するコールバック */
+  onTotalCountChange?: (count: number) => void;
 }
 
 /**
  * ログインユーザーの推し全員分（または特定の推し）の出演情報一覧を表示するコンポーネント。
  * 各アイテムをカード形式で表示し、タイトル・推し名・出典・掲載日を一目で確認できる。
  */
-export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
+export function ProgramFeedList({
+  oshiId,
+  onTotalCountChange,
+}: ProgramFeedListProps) {
   const [data, setData] = useState<ProgramsPaginatedResponse | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +39,7 @@ export function ProgramFeedList({ oshiId }: ProgramFeedListProps) {
       try {
         const result = await getPrograms(page, 20, oshiId, dateFrom, dateTo);
         setData(result);
+        onTotalCountChange?.(result.totalCount);
       } catch (err) {
         if (err instanceof ApiError) {
           setError(err.message);
