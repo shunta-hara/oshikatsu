@@ -36,10 +36,15 @@ docs/spec-oshi-tracking.md に仕様書を生成・追記済み。
 - 画像箱判定 5ルール（R1〜R5）は backend 1か所で管理、ブックマーク一覧は除外対象外
 - 並び順変更: ニュース=PublishedAt降順+ID降順、出演情報=AiredAt降順+ID降順。未読件数はCollectedAt基準のまま
 
+2026-10-04 追記内容（FEAT-033〜034）:
+- FEAT-033（Sprint 30）: 推しごとの「番組表で探す」リンク（Gガイド・J:COM）/ frontend / Should。Sprint 30 は実装・合格済み
+- FEAT-034（Sprint 31）: 収集定期起動を Cloudflare Workers Cron Triggers に移行。scheduler/ ディレクトリ追加、GitHub workflow_dispatch API 呼び出し、3回リトライ、secrets 管理 / scheduler（新規層）/ Should
+
 技術的背景:
 - collector 書き込みは backend 内部 API 経由（直接 DB 書き込みは不採用）
-- デプロイ先: frontend=Cloudflare Pages / backend=Render / DB=Neon / collector=GitHub Actions
-- 収集間隔: 初期6時間 → 一括送信後2時間目安（実測後1時間も検討）
+- デプロイ先: frontend=Cloudflare Pages / backend=Render / DB=Neon / collector=GitHub Actions / scheduler=Cloudflare Workers
+- 収集間隔: 2時間ごと（UTC 毎偶数時 17 分、`17 */2 * * *`）
+- GitHub Actions schedule が 2026-08-26 以降不安定（9回中2回のみ起動）→ Cloudflare Workers Cron で補完
 
-**Why:** 2026-10-04 本番運用で、フィードが古い順・画像箱ノイズ・ブックマーク絞り込み不足・ニュースと出演情報が混在の4問題が確認された。
-**How to apply:** 次に仕様追記を依頼されたら FEAT-033〜、Sprint 30〜 から採番する。
+**Why:** 2026-10-04 本番運用で、フィードが古い順・画像箱ノイズ・ブックマーク絞り込み不足・ニュースと出演情報が混在・定期収集の信頼性問題が確認された。
+**How to apply:** 次に仕様追記を依頼されたら FEAT-035〜、Sprint 32〜 から採番する。

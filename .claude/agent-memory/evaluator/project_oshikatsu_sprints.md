@@ -5,6 +5,14 @@ metadata:
   type: project
 ---
 
+Sprint 31 評価：合格（2回目）。FEAT-034（Cloudflare Workers 定期起動）。
+
+**Why:** 1回目は ScheduledEvent→ScheduledController 型エラーで不合格。2回目で修正済み。tsc 0エラー、vitest 15/15、wrangler dry-run 成功。動的テスト: `/__scheduled` → 空トークン → 401 受信 → 非リトライ → エラーログ確認。GITHUB_DISPATCH_TOKEN は wrangler.toml [vars] に存在せず（secret）。AbortSignal.timeout タイムアウト実装・テスト3件確認済み。
+
+**How to apply:** Sprint 31 合格。FEAT-034 完了。全スプリント（1〜31）完了。
+
+---
+
 Sprint 30 評価：合格（1回目）。259/259 全テスト通過。FEAT-033（番組表リンク）すべて確認済み。
 
 **Why:** Sprint 30 は FEAT-033（推しごとの番組表検索リンク）。tvGuideUrls.ts + TvGuideLinks.tsx のみ。推し選択時のみ出演情報列に表示。Gガイド・J:COM 両リンクとも target="_blank" / rel="noopener noreferrer"、URLエンコード正常。backend/collector 変更なし。

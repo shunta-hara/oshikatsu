@@ -204,12 +204,63 @@ GitHub の **Actions** タブで `collect.yml` の実行履歴を確認できま
 
 ---
 
-## 手順 9. 動作確認
+## 手順 9. Cloudflare Workers で収集の定期起動を設定する（オプション）
+
+GitHub Actions の `schedule` は GitHub 側の負荷で実行が遅延・欠落することがあります。
+`scheduler/` の Cloudflare Worker を使うと、Cloudflare の Cron Triggers から直接 GitHub の `workflow_dispatch` API を呼ぶため、定期実行の信頼性が上がります。
+GitHub Actions の `schedule` は予備として残してあるので、万一 Cloudflare 側が動かなくても GitHub 側が補います。Cloudflare の無料枠で動作します。
+
+### 9a. fine-grained PAT を作成する
+
+手順 8a で作成した PAT と同じものを使えます（`Actions: Read and write` 権限があれば十分）。未作成の場合は手順 8a を参照してください。
+
+> すでに手順 8a の PAT を持っていれば、同じトークンを Cloudflare の secret にも使えます。
+
+### 9b. Cloudflare にログインして Worker をデプロイする
+
+```bash
+cd scheduler
+npx wrangler login          # ブラウザが開くので Cloudflare アカウントでログイン
+npx wrangler deploy         # Worker をデプロイする（初回は 10 秒ほど）
+```
+
+デプロイが成功すると `oshikatsu-scheduler` という Worker が Cloudflare ダッシュボードに現れます。
+
+### 9c. GITHUB_DISPATCH_TOKEN を登録する
+
+```bash
+npx wrangler secret put GITHUB_DISPATCH_TOKEN
+# プロンプトが出るので、手順 8a の PAT（github_pat_...）を貼り付けて Enter
+```
+
+secret は Cloudflare 上で暗号化されます。コードやログに値は出力されません。
+
+### 動作確認
+
+1. Cloudflare ダッシュボード → Workers & Pages → `oshikatsu-scheduler` → **Triggers** タブを開く
+2. 「Cron Triggers」欄に `17 */2 * * *` が表示されていることを確認する
+3. 「Test」ボタン（または「▶ Run manually」）を押して手動で Worker を起動する
+4. 同じページの **Logs** タブ（またはリアルタイムログ）で次のようなメッセージが出れば成功:
+   ```
+   [scheduler] cron triggered at ...
+   [scheduler] dispatched collect.yml successfully
+   ```
+5. GitHub の Actions タブで `collect.yml` が起動されたことを確認する:
+   ```bash
+   gh run list --workflow collect.yml
+   ```
+
+Worker のログが `non-retryable HTTP status: 401` と出た場合は、`GITHUB_DISPATCH_TOKEN` の値か権限（Actions: Read and write）を確認してください。
+
+---
+
+## 手順 10. 動作確認
 
 - [ ] frontend の URL を開くとログイン画面が出る（Render がスリープしていると、最初の応答に1分ほどかかる）
 - [ ] 新規登録して、推しを1人追加する
 - [ ] 手順 7 の手動実行をもう一度行い、成功したあとにダッシュボードでニュースや出演番組が表示される
 - [ ] `/bookmarks` を直接開いてもページが表示される
+- [ ] （手順 9 を実施した場合）Cloudflare ダッシュボードの Logs で Worker の起動ログが確認できる
 
 ## うまくいかないとき
 

@@ -6,6 +6,7 @@ oshikatsu/
 ├── frontend/   # React + TypeScript（Vite）
 ├── backend/    # C# ASP.NET Core Web API（メインAPI・認証・DB操作）
 ├── collector/  # Python（出演番組・ニュース収集バッチ）
+├── scheduler/  # Cloudflare Workers（Cron Triggers で collector の定期起動を担当）
 ├── docs/       # 仕様書（spec-*.md）・設計メモ
 └── .claude/    # Claude Code ハーネス
 ```
@@ -14,6 +15,7 @@ oshikatsu/
 - **backend**: 推し・出演番組・ニュースのデータモデルの正本。API・認証・DB操作を一手に担う
 - **frontend**: backend の API のみを叩く。DB に直接アクセスしない
 - **collector**: 番組表・ニュースソースから情報を収集し、backend 経由（または合意した方式）でDBに反映する。フロントエンドのロジックを持たない
+- **scheduler**: Cloudflare Workers の Cron Triggers から GitHub の workflow_dispatch API を呼び出して collector を定期起動する。データ処理・収集ロジックは持たない
 
 ## API契約
 - backend が提供する API は OpenAPI（Swagger）で定義・公開する

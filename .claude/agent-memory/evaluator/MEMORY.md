@@ -1,3 +1,3 @@
 # Evaluator Agent Memory Index
 
-- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — Sprint 30（FEAT-033 番組表リンク）合格（1回目）。259/259 全テスト通過。全スプリント完了
+- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — Sprint 31（FEAT-034 Cloudflare Workers）合格（2回目）。全スプリント（1〜31）完了

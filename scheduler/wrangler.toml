@@ -1,0 +1,11 @@
+name = "oshikatsu-scheduler"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+
+[triggers]
+crons = ["17 */2 * * *"]
+
+[vars]
+GITHUB_REPOSITORY = "shunta-hara/oshikatsu"
+GITHUB_WORKFLOW_FILE = "collect.yml"
+GITHUB_REF = "master"
