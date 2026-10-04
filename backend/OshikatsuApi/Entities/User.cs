@@ -21,4 +21,5 @@ public class User
 
     // Navigation
     public ICollection<Oshi> Oshis { get; set; } = new List<Oshi>();
+    public ICollection<UserOshi> UserOshis { get; set; } = new List<UserOshi>();
 }

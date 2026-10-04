@@ -7,8 +7,11 @@ public class NewsItem
 {
     public int Id { get; set; }
 
-    /// <summary>紐づく推しID</summary>
+    /// <summary>紐づく推しID（後方互換のため残存）</summary>
     public int OshiId { get; set; }
+
+    /// <summary>紐づくタレントID（talents テーブルへの外部キー）</summary>
+    public int? TalentId { get; set; }
 
     /// <summary>記事タイトル</summary>
     public string Title { get; set; } = null!;
@@ -38,4 +41,5 @@ public class NewsItem
 
     // Navigation
     public Oshi Oshi { get; set; } = null!;
+    public Talent? Talent { get; set; }
 }

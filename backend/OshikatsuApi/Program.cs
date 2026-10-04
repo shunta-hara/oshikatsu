@@ -113,6 +113,9 @@ builder.Services.AddScoped<ICollectorJobLogService, CollectorJobLogService>();
 // ブックマークサービス
 builder.Services.AddScoped<IBookmarkService, BookmarkService>();
 
+// 古い記事の自動削除サービス
+builder.Services.AddScoped<INewsCleanupService, NewsCleanupService>();
+
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 

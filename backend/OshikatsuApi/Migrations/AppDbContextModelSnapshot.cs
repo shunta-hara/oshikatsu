@@ -140,6 +140,10 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("text")
                         .HasColumnName("summary");
 
+                    b.Property<int?>("TalentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("talent_id");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasColumnType("text")
@@ -150,8 +154,14 @@ namespace OshikatsuApi.Migrations
                     b.HasIndex("OshiId")
                         .HasDatabaseName("ix_news_items_oshi_id");
 
+                    b.HasIndex("PublishedAt")
+                        .HasDatabaseName("ix_news_items_published_at");
+
                     b.HasIndex("SourceUrl")
                         .HasDatabaseName("ix_news_items_source_url");
+
+                    b.HasIndex("TalentId")
+                        .HasDatabaseName("ix_news_items_talent_id");
 
                     b.ToTable("news_items", (string)null);
                 });
@@ -239,6 +249,10 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("text")
                         .HasColumnName("source_url");
 
+                    b.Property<int?>("TalentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("talent_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("OshiId")
@@ -246,6 +260,9 @@ namespace OshikatsuApi.Migrations
 
                     b.HasIndex("SourceUrl")
                         .HasDatabaseName("ix_program_appearances_source_url");
+
+                    b.HasIndex("TalentId")
+                        .HasDatabaseName("ix_program_appearances_talent_id");
 
                     b.ToTable("program_appearances", (string)null);
                 });
@@ -280,6 +297,40 @@ namespace OshikatsuApi.Migrations
                         .HasDatabaseName("ix_revoked_tokens_jti");
 
                     b.ToTable("revoked_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("OshikatsuApi.Entities.Talent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("normalized_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_talents_normalized_name");
+
+                    b.ToTable("talents", (string)null);
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.User", b =>
@@ -323,6 +374,42 @@ namespace OshikatsuApi.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("OshikatsuApi.Entities.UserOshi", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("TalentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("talent_id");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TalentId")
+                        .HasDatabaseName("ix_user_oshis_talent_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_oshis_user_id");
+
+                    b.HasIndex("UserId", "TalentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_oshis_user_id_talent_id");
+
+                    b.ToTable("user_oshis", (string)null);
+                });
+
             modelBuilder.Entity("OshikatsuApi.Entities.Bookmark", b =>
                 {
                     b.HasOne("OshikatsuApi.Entities.NewsItem", "NewsItem")
@@ -350,7 +437,14 @@ namespace OshikatsuApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
+                        .WithMany("NewsItems")
+                        .HasForeignKey("TalentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Oshi");
+
+                    b.Navigation("Talent");
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.Oshi", b =>
@@ -372,7 +466,33 @@ namespace OshikatsuApi.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
+                        .WithMany("ProgramAppearances")
+                        .HasForeignKey("TalentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Oshi");
+
+                    b.Navigation("Talent");
+                });
+
+            modelBuilder.Entity("OshikatsuApi.Entities.UserOshi", b =>
+                {
+                    b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
+                        .WithMany("UserOshis")
+                        .HasForeignKey("TalentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OshikatsuApi.Entities.User", "User")
+                        .WithMany("UserOshis")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Talent");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.Oshi", b =>
@@ -382,9 +502,20 @@ namespace OshikatsuApi.Migrations
                     b.Navigation("ProgramAppearances");
                 });
 
+            modelBuilder.Entity("OshikatsuApi.Entities.Talent", b =>
+                {
+                    b.Navigation("NewsItems");
+
+                    b.Navigation("ProgramAppearances");
+
+                    b.Navigation("UserOshis");
+                });
+
             modelBuilder.Entity("OshikatsuApi.Entities.User", b =>
                 {
                     b.Navigation("Oshis");
+
+                    b.Navigation("UserOshis");
                 });
 #pragma warning restore 612, 618
         }

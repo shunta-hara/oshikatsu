@@ -9,6 +9,8 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Oshi> Oshis => Set<Oshi>();
+    public DbSet<Talent> Talents => Set<Talent>();
+    public DbSet<UserOshi> UserOshis => Set<UserOshi>();
     public DbSet<NewsItem> NewsItems => Set<NewsItem>();
     public DbSet<ProgramAppearance> ProgramAppearances => Set<ProgramAppearance>();
     public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
@@ -64,6 +66,58 @@ public class AppDbContext : DbContext
                   .HasDatabaseName("ix_oshis_user_id");
         });
 
+        // ─── Talent ──────────────────────────────────────────────────────────
+        modelBuilder.Entity<Talent>(entity =>
+        {
+            entity.ToTable("talents");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.DisplayName)
+                  .HasColumnName("display_name")
+                  .HasMaxLength(100)
+                  .IsRequired();
+            entity.Property(e => e.NormalizedName)
+                  .HasColumnName("normalized_name")
+                  .HasMaxLength(100)
+                  .IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasIndex(e => e.NormalizedName)
+                  .IsUnique()
+                  .HasDatabaseName("ix_talents_normalized_name");
+        });
+
+        // ─── UserOshi ────────────────────────────────────────────────────────
+        modelBuilder.Entity<UserOshi>(entity =>
+        {
+            entity.ToTable("user_oshis");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.TalentId).HasColumnName("talent_id");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.UserOshis)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Talent)
+                  .WithMany(t => t.UserOshis)
+                  .HasForeignKey(e => e.TalentId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => new { e.UserId, e.TalentId })
+                  .IsUnique()
+                  .HasDatabaseName("ix_user_oshis_user_id_talent_id");
+
+            entity.HasIndex(e => e.UserId)
+                  .HasDatabaseName("ix_user_oshis_user_id");
+
+            entity.HasIndex(e => e.TalentId)
+                  .HasDatabaseName("ix_user_oshis_talent_id");
+        });
+
         // ─── NewsItem ────────────────────────────────────────────────────────
         modelBuilder.Entity<NewsItem>(entity =>
         {
@@ -81,6 +135,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.SourceName)
                   .HasColumnName("source_name")
                   .HasMaxLength(200);
+            entity.Property(e => e.TalentId).HasColumnName("talent_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
 
             entity.HasOne(e => e.Oshi)
@@ -88,10 +143,20 @@ public class AppDbContext : DbContext
                   .HasForeignKey(e => e.OshiId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(e => e.Talent)
+                  .WithMany(t => t.NewsItems)
+                  .HasForeignKey(e => e.TalentId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+
             entity.HasIndex(e => e.OshiId)
                   .HasDatabaseName("ix_news_items_oshi_id");
+            entity.HasIndex(e => e.TalentId)
+                  .HasDatabaseName("ix_news_items_talent_id");
             entity.HasIndex(e => e.SourceUrl)
                   .HasDatabaseName("ix_news_items_source_url");
+            entity.HasIndex(e => e.PublishedAt)
+                  .HasDatabaseName("ix_news_items_published_at");
         });
 
         // ─── ProgramAppearance ───────────────────────────────────────────────
@@ -113,6 +178,7 @@ public class AppDbContext : DbContext
             entity.Property(e => e.SourceName)
                   .HasColumnName("source_name")
                   .HasMaxLength(200);
+            entity.Property(e => e.TalentId).HasColumnName("talent_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
 
             entity.HasOne(e => e.Oshi)
@@ -120,8 +186,16 @@ public class AppDbContext : DbContext
                   .HasForeignKey(e => e.OshiId)
                   .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(e => e.Talent)
+                  .WithMany(t => t.ProgramAppearances)
+                  .HasForeignKey(e => e.TalentId)
+                  .OnDelete(DeleteBehavior.Restrict)
+                  .IsRequired(false);
+
             entity.HasIndex(e => e.OshiId)
                   .HasDatabaseName("ix_program_appearances_oshi_id");
+            entity.HasIndex(e => e.TalentId)
+                  .HasDatabaseName("ix_program_appearances_talent_id");
             entity.HasIndex(e => e.SourceUrl)
                   .HasDatabaseName("ix_program_appearances_source_url");
         });

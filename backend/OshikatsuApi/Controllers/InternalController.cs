@@ -17,13 +17,16 @@ public class InternalController : ControllerBase
 {
     private readonly IInternalCollectorService _collectorService;
     private readonly ICollectorJobLogService _jobLogService;
+    private readonly INewsCleanupService _cleanupService;
 
     public InternalController(
         IInternalCollectorService collectorService,
-        ICollectorJobLogService jobLogService)
+        ICollectorJobLogService jobLogService,
+        INewsCleanupService cleanupService)
     {
         _collectorService = collectorService;
         _jobLogService = jobLogService;
+        _cleanupService = cleanupService;
     }
 
     /// <summary>ニュースアイテムを登録する（重複ソースURLは無視）</summary>
@@ -150,5 +153,22 @@ public class InternalController : ControllerBase
     {
         var result = await _jobLogService.RecordJobLogAsync(dto);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// 保持期間（90日）を超えた未ブックマーク記事を一括削除する。
+    /// PublishedAt が null の場合は CollectedAt を基準とする。
+    /// ブックマーク済みの記事は削除しない。
+    /// 1回の実行で最大 1000 件を削除し、大量レコード蓄積時のロックを抑制する。
+    /// </summary>
+    /// <response code="200">削除成功。削除件数を JSON で返す。</response>
+    /// <response code="401">API キーなし・不正</response>
+    [HttpDelete("news/expired")]
+    [ProducesResponseType(typeof(DeleteExpiredNewsResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> DeleteExpiredNews()
+    {
+        var deletedCount = await _cleanupService.DeleteExpiredNewsAsync();
+        return Ok(new DeleteExpiredNewsResponseDto { DeletedCount = deletedCount });
     }
 }
