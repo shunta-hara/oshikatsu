@@ -42,7 +42,7 @@ public class FeedService : IFeedService
             oshiIds = [oshiId.Value];
         }
 
-        var newsQuery = _db.NewsItems.Where(n => oshiIds.Contains(n.OshiId));
+        var newsQuery = _db.NewsItems.Where(n => n.OshiId.HasValue && oshiIds.Contains(n.OshiId.Value));
 
         // キーワード検索: タイトルまたは本文要約に対して大文字小文字を区別しない部分一致で絞り込む。
         // ToLower().Contains() を使うことで、PostgreSQL（Npgsql が lower()+strpos に変換）と
@@ -119,8 +119,8 @@ public class FeedService : IFeedService
             return new NewsItemResponseDto
             {
                 Id = n.Id,
-                OshiId = n.OshiId,
-                OshiName = oshiNameMap.GetValueOrDefault(n.OshiId) ?? string.Empty,
+                OshiId = n.OshiId ?? 0,
+                OshiName = oshiNameMap.GetValueOrDefault(n.OshiId ?? 0) ?? string.Empty,
                 Title = n.Title,
                 Summary = n.Summary,
                 SourceUrl = n.SourceUrl,
@@ -176,7 +176,7 @@ public class FeedService : IFeedService
             oshiIds = [oshiId.Value];
         }
 
-        var programsQuery = _db.ProgramAppearances.Where(p => oshiIds.Contains(p.OshiId));
+        var programsQuery = _db.ProgramAppearances.Where(p => p.OshiId.HasValue && oshiIds.Contains(p.OshiId.Value));
 
         // FEAT-024: 同推しのニュースと sourceUrl が重複する番組を除外（DBからは削除しない）
         programsQuery = programsQuery
@@ -230,8 +230,8 @@ public class FeedService : IFeedService
             return new ProgramAppearanceResponseDto
             {
                 Id = p.Id,
-                OshiId = p.OshiId,
-                OshiName = oshiNameMap.GetValueOrDefault(p.OshiId) ?? string.Empty,
+                OshiId = p.OshiId ?? 0,
+                OshiName = oshiNameMap.GetValueOrDefault(p.OshiId ?? 0) ?? string.Empty,
                 ProgramName = p.ProgramName,
                 Broadcaster = p.Broadcaster,
                 AiredAt = p.AiredAt,
@@ -282,11 +282,11 @@ public class FeedService : IFeedService
         }
 
         var newsCount = await _db.NewsItems
-            .Where(n => oshiIds.Contains(n.OshiId) && n.CollectedAt > lastViewed)
+            .Where(n => n.OshiId.HasValue && oshiIds.Contains(n.OshiId.Value) && n.CollectedAt > lastViewed)
             .CountAsync();
 
         var programCount = await _db.ProgramAppearances
-            .Where(p => oshiIds.Contains(p.OshiId) && p.CollectedAt > lastViewed)
+            .Where(p => p.OshiId.HasValue && oshiIds.Contains(p.OshiId.Value) && p.CollectedAt > lastViewed)
             .CountAsync();
 
         return newsCount + programCount;

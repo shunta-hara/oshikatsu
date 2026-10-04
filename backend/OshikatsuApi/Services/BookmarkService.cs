@@ -133,8 +133,8 @@ public class BookmarkService : IBookmarkService
         {
             Id = b.Id,
             NewsItemId = b.NewsItemId,
-            OshiId = b.NewsItem.OshiId,
-            OshiName = b.NewsItem.Oshi.Name,
+            OshiId = b.NewsItem.OshiId ?? 0,
+            OshiName = b.NewsItem.Oshi?.Name ?? string.Empty,
             Title = b.NewsItem.Title,
             Summary = b.NewsItem.Summary,
             SourceUrl = b.NewsItem.SourceUrl,

@@ -14,6 +14,7 @@ public class InternalControllerBatchTests
 {
     private readonly IInternalCollectorService _service;
     private readonly ICollectorJobLogService _jobLogService;
+    private readonly INewsCleanupService _cleanupService;
     private readonly InternalController _sut;
     private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
 
@@ -21,7 +22,8 @@ public class InternalControllerBatchTests
     {
         _service = Substitute.For<IInternalCollectorService>();
         _jobLogService = Substitute.For<ICollectorJobLogService>();
-        _sut = new InternalController(_service, _jobLogService);
+        _cleanupService = Substitute.For<INewsCleanupService>();
+        _sut = new InternalController(_service, _jobLogService, _cleanupService);
     }
 
     // ── POST /api/v1/internal/news/batch: 正常系 ────────────────────────────
@@ -86,7 +88,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = [],
         };
 
@@ -101,7 +103,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = Enumerable.Range(0, 201)
                 .Select(i => new BatchNewsItemDto
                 {
@@ -118,10 +120,10 @@ public class InternalControllerBatchTests
     }
 
     [Fact]
-    public async Task BatchCreateNews_OshiNotFound_Returns404()
+    public async Task BatchCreateNews_TalentNotFound_Returns404()
     {
         var dto = BuildNewsBatchRequest(1);
-        _service.BatchCreateNewsItemsAsync(dto).Throws<OshiNotFoundException>();
+        _service.BatchCreateNewsItemsAsync(dto).Throws<TalentNotFoundException>();
 
         var result = await _sut.BatchCreateNews(dto);
 
@@ -191,7 +193,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = [],
         };
 
@@ -206,7 +208,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = Enumerable.Range(0, 201)
                 .Select(i => new BatchProgramItemDto
                 {
@@ -223,10 +225,10 @@ public class InternalControllerBatchTests
     }
 
     [Fact]
-    public async Task BatchCreatePrograms_OshiNotFound_Returns404()
+    public async Task BatchCreatePrograms_TalentNotFound_Returns404()
     {
         var dto = BuildProgramBatchRequest(1);
-        _service.BatchCreateProgramAppearancesAsync(dto).Throws<OshiNotFoundException>();
+        _service.BatchCreateProgramAppearancesAsync(dto).Throws<TalentNotFoundException>();
 
         var result = await _sut.BatchCreatePrograms(dto);
 
@@ -241,7 +243,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = Enumerable.Range(0, 200)
                 .Select(i => new BatchNewsItemDto
                 {
@@ -267,7 +269,7 @@ public class InternalControllerBatchTests
     {
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = 1,
+            TalentId = 1,
             Items = Enumerable.Range(0, 200)
                 .Select(i => new BatchProgramItemDto
                 {
@@ -292,7 +294,7 @@ public class InternalControllerBatchTests
 
     private BatchCreateNewsRequestDto BuildNewsBatchRequest(int count) => new()
     {
-        OshiId = 1,
+        TalentId = 1,
         Items = Enumerable.Range(1, count)
             .Select(i => new BatchNewsItemDto
             {
@@ -304,7 +306,7 @@ public class InternalControllerBatchTests
 
     private BatchCreateProgramsRequestDto BuildProgramBatchRequest(int count) => new()
     {
-        OshiId = 1,
+        TalentId = 1,
         Items = Enumerable.Range(1, count)
             .Select(i => new BatchProgramItemDto
             {

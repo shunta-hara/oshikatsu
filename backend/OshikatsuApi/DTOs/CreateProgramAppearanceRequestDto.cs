@@ -5,9 +5,9 @@ namespace OshikatsuApi.DTOs;
 /// <summary>内部API: 出演番組情報登録リクエスト</summary>
 public class CreateProgramAppearanceRequestDto
 {
-    /// <summary>紐づく推しID</summary>
+    /// <summary>紐づくタレントID（talents.id）</summary>
     [Required]
-    public int OshiId { get; set; }
+    public int TalentId { get; set; }
 
     /// <summary>番組名</summary>
     [Required]
@@ -32,4 +32,8 @@ public class CreateProgramAppearanceRequestDto
     /// <summary>collector が収集した日時（UTC）</summary>
     [Required]
     public DateTimeOffset CollectedAt { get; set; }
+
+    /// <summary>媒体名（任意）</summary>
+    [MaxLength(200)]
+    public string? SourceName { get; set; }
 }

@@ -34,7 +34,7 @@ public class DashboardService : IDashboardService
         // FEAT-029: PublishedAt 降順、同一のとき ID 降順で並べる
         // FEAT-030: 画像箱を除外する
         var newsItems = await _db.NewsItems
-            .Where(n => oshiIds.Contains(n.OshiId))
+            .Where(n => n.OshiId.HasValue && oshiIds.Contains(n.OshiId.Value))
             .OrderByDescending(n => n.PublishedAt)
             .ThenByDescending(n => n.Id)
             .ToListAsync();
@@ -46,7 +46,8 @@ public class DashboardService : IDashboardService
         var newsGroups = ArticleDeduplicator.GroupNewsItems(filteredNewsItems);
         // 代表の推しIDごとに最新（最初）のグループを取得
         var latestNewsGroupByOshiId = newsGroups
-            .GroupBy(g => g.Representative.OshiId)
+            .Where(g => g.Representative.OshiId.HasValue)
+            .GroupBy(g => g.Representative.OshiId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
 
         // クエリ 3: 全推しの出演番組を AiredAt 降順で一括取得し、メモリで推しごとに最新1件を抽出（N+1 回避）
@@ -54,7 +55,7 @@ public class DashboardService : IDashboardService
         // FEAT-029: AiredAt 降順、同一のとき ID 降順で並べる
         // FEAT-030: 画像箱を除外する
         var programItems = await _db.ProgramAppearances
-            .Where(p => oshiIds.Contains(p.OshiId))
+            .Where(p => p.OshiId.HasValue && oshiIds.Contains(p.OshiId.Value))
             .Where(p => !_db.NewsItems.Any(n => n.OshiId == p.OshiId && n.SourceUrl == p.SourceUrl))
             .OrderByDescending(p => p.AiredAt)
             .ThenByDescending(p => p.Id)
@@ -66,7 +67,8 @@ public class DashboardService : IDashboardService
             .ToList();
         var programGroups = ArticleDeduplicator.GroupProgramItems(filteredProgramItems);
         var latestProgramGroupByOshiId = programGroups
-            .GroupBy(g => g.Representative.OshiId)
+            .Where(g => g.Representative.OshiId.HasValue)
+            .GroupBy(g => g.Representative.OshiId!.Value)
             .ToDictionary(g => g.Key, g => g.First());
 
         // 3 クエリ合計（N+1 なし）でカードを組み立てて返す

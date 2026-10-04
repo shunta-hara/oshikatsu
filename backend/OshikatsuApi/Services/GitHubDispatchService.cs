@@ -20,7 +20,7 @@ public class GitHubDispatchService : IGitHubDispatchService
     }
 
     /// <inheritdoc />
-    public async Task TriggerCollectAsync(int oshiId)
+    public async Task TriggerCollectAsync(int talentId)
     {
         var token = Environment.GetEnvironmentVariable("GITHUB_DISPATCH_TOKEN");
         if (string.IsNullOrEmpty(token))
@@ -55,7 +55,7 @@ public class GitHubDispatchService : IGitHubDispatchService
             var payload = new
             {
                 @ref = gitRef,
-                inputs = new { oshi_id = oshiId.ToString() },
+                inputs = new { talent_id = talentId.ToString() },
             };
 
             using var request = new HttpRequestMessage(HttpMethod.Post, url);
@@ -72,14 +72,14 @@ public class GitHubDispatchService : IGitHubDispatchService
             if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
             {
                 _logger.LogInformation(
-                    "workflow_dispatch を起動しました（oshiId={OshiId}）。", oshiId);
+                    "workflow_dispatch を起動しました（talentId={TalentId}）。", talentId);
             }
             else
             {
                 var body = await response.Content.ReadAsStringAsync(cts.Token);
                 _logger.LogWarning(
-                    "workflow_dispatch の起動に失敗しました（oshiId={OshiId}, status={Status}）。",
-                    oshiId, (int)response.StatusCode);
+                    "workflow_dispatch の起動に失敗しました（talentId={TalentId}, status={Status}）。",
+                    talentId, (int)response.StatusCode);
                 // body はデバッグ用に Debug レベルで出す（本番ログに流さない）
                 _logger.LogDebug("GitHub API レスポンス本文: {Body}", body);
             }
@@ -87,12 +87,12 @@ public class GitHubDispatchService : IGitHubDispatchService
         catch (OperationCanceledException)
         {
             _logger.LogWarning(
-                "workflow_dispatch がタイムアウトしました（oshiId={OshiId}）。", oshiId);
+                "workflow_dispatch がタイムアウトしました（talentId={TalentId}）。", talentId);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "workflow_dispatch の起動中に例外が発生しました（oshiId={OshiId}）。", oshiId);
+                "workflow_dispatch の起動中に例外が発生しました（talentId={TalentId}）。", talentId);
         }
     }
 }

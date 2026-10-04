@@ -28,13 +28,17 @@ public class InternalCollectorServiceBatchTests : IDisposable
 
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
-    private async Task<Oshi> AddOshiAsync(int userId = 1, string name = "テスト推し")
+    private async Task<Talent> AddTalentAsync(int userId = 1, string displayName = "テストタレント")
     {
-        var dbNow = DateTime.UtcNow;
-        var oshi = new Oshi { UserId = userId, Name = name, CreatedAt = dbNow, UpdatedAt = dbNow };
-        _db.Oshis.Add(oshi);
+        var talent = new Talent
+        {
+            DisplayName = displayName,
+            NormalizedName = displayName.ToLowerInvariant().Replace(" ", ""),
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
         await _db.SaveChangesAsync();
-        return oshi;
+        return talent;
     }
 
     private BatchNewsItemDto BuildNewsItem(string sourceUrl, string title = "ニュースタイトル") => new()
@@ -60,10 +64,10 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_ValidItems_SavesAll()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildNewsItem("https://example.com/1"),
                 BuildNewsItem("https://example.com/2"),
@@ -82,10 +86,10 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_ValidItems_ReturnsCorrectCounts()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildNewsItem("https://example.com/news/a")],
         };
 
@@ -99,7 +103,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_NullPublishedAt_SetsEstimatedFlag()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var item = new BatchNewsItemDto
         {
             Title = "タイトル",
@@ -107,7 +111,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
             PublishedAt = null,
             CollectedAt = _now,
         };
-        var dto = new BatchCreateNewsRequestDto { OshiId = oshi.Id, Items = [item] };
+        var dto = new BatchCreateNewsRequestDto { TalentId = talent.Id, Items = [item] };
 
         await _sut.BatchCreateNewsItemsAsync(dto);
 
@@ -119,7 +123,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_WithPublishedAt_StoresActualDateNotEstimated()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var publishedAt = _now.AddHours(-2);
         var item = new BatchNewsItemDto
         {
@@ -128,7 +132,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
             PublishedAt = publishedAt,
             CollectedAt = _now,
         };
-        var dto = new BatchCreateNewsRequestDto { OshiId = oshi.Id, Items = [item] };
+        var dto = new BatchCreateNewsRequestDto { TalentId = talent.Id, Items = [item] };
 
         await _sut.BatchCreateNewsItemsAsync(dto);
 
@@ -140,7 +144,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_JstPublishedAt_NormalizesToUtc()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9));
         var item = new BatchNewsItemDto
         {
@@ -149,7 +153,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
             PublishedAt = jstTime,
             CollectedAt = _now,
         };
-        var dto = new BatchCreateNewsRequestDto { OshiId = oshi.Id, Items = [item] };
+        var dto = new BatchCreateNewsRequestDto { TalentId = talent.Id, Items = [item] };
 
         await _sut.BatchCreateNewsItemsAsync(dto);
 
@@ -163,10 +167,10 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_DuplicateWithinRequest_OnlySavesFirst()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildNewsItem("https://example.com/dup"),
                 BuildNewsItem("https://example.com/dup"),
@@ -184,11 +188,11 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_DuplicateWithExisting_SkipsExisting()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         // 事前に1件保存
         var initial = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildNewsItem("https://example.com/existing")],
         };
         await _sut.BatchCreateNewsItemsAsync(initial);
@@ -196,7 +200,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
         // 同じURLを含む一括登録
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildNewsItem("https://example.com/existing"),
                 BuildNewsItem("https://example.com/new"),
@@ -212,21 +216,21 @@ public class InternalCollectorServiceBatchTests : IDisposable
     }
 
     [Fact]
-    public async Task BatchCreateNewsItemsAsync_SameUrlDifferentOshi_SavesBoth()
+    public async Task BatchCreateNewsItemsAsync_SameUrlDifferentTalent_SavesBoth()
     {
-        var oshi1 = await AddOshiAsync(userId: 1, name: "推し1");
-        var oshi2 = await AddOshiAsync(userId: 2, name: "推し2");
+        var talent1 = await AddTalentAsync(userId: 1, displayName: "タレント1");
+        var talent2 = await AddTalentAsync(userId: 2, displayName: "タレント2");
         var url = "https://example.com/shared";
 
         await _sut.BatchCreateNewsItemsAsync(new BatchCreateNewsRequestDto
         {
-            OshiId = oshi1.Id,
+            TalentId = talent1.Id,
             Items = [BuildNewsItem(url)],
         });
 
         var result = await _sut.BatchCreateNewsItemsAsync(new BatchCreateNewsRequestDto
         {
-            OshiId = oshi2.Id,
+            TalentId = talent2.Id,
             Items = [BuildNewsItem(url)],
         });
 
@@ -237,15 +241,15 @@ public class InternalCollectorServiceBatchTests : IDisposable
     // ── BatchCreateNewsItemsAsync: 異常系 ───────────────────────────────────
 
     [Fact]
-    public async Task BatchCreateNewsItemsAsync_OshiNotFound_ThrowsOshiNotFoundException()
+    public async Task BatchCreateNewsItemsAsync_TalentNotFound_ThrowsTalentNotFoundException()
     {
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = 99999,
+            TalentId = 99999,
             Items = [BuildNewsItem("https://example.com/x")],
         };
 
-        await Assert.ThrowsAsync<OshiNotFoundException>(() => _sut.BatchCreateNewsItemsAsync(dto));
+        await Assert.ThrowsAsync<TalentNotFoundException>(() => _sut.BatchCreateNewsItemsAsync(dto));
     }
 
     // ── BatchCreateProgramAppearancesAsync: 正常系 ───────────────────────────
@@ -253,10 +257,10 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_ValidItems_SavesAll()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildProgramItem("https://tv.example.com/1"),
                 BuildProgramItem("https://tv.example.com/2"),
@@ -274,7 +278,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_NullAiredAt_SetsEstimatedFlag()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var item = new BatchProgramItemDto
         {
             ProgramName = "テスト番組",
@@ -282,7 +286,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
             AiredAt = null,
             CollectedAt = _now,
         };
-        var dto = new BatchCreateProgramsRequestDto { OshiId = oshi.Id, Items = [item] };
+        var dto = new BatchCreateProgramsRequestDto { TalentId = talent.Id, Items = [item] };
 
         await _sut.BatchCreateProgramAppearancesAsync(dto);
 
@@ -293,7 +297,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_JstAiredAt_NormalizesToUtc()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var jstTime = new DateTimeOffset(2026, 10, 5, 20, 0, 0, TimeSpan.FromHours(9));
         var item = new BatchProgramItemDto
         {
@@ -302,7 +306,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
             AiredAt = jstTime,
             CollectedAt = _now,
         };
-        var dto = new BatchCreateProgramsRequestDto { OshiId = oshi.Id, Items = [item] };
+        var dto = new BatchCreateProgramsRequestDto { TalentId = talent.Id, Items = [item] };
 
         await _sut.BatchCreateProgramAppearancesAsync(dto);
 
@@ -316,10 +320,10 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_DuplicateWithinRequest_OnlySavesFirst()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildProgramItem("https://tv.example.com/dup"),
                 BuildProgramItem("https://tv.example.com/dup"),
@@ -337,16 +341,16 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_DuplicateWithExistingProgram_SkipsExisting()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         await _sut.BatchCreateProgramAppearancesAsync(new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildProgramItem("https://tv.example.com/existing")],
         });
 
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [
                 BuildProgramItem("https://tv.example.com/existing"),
                 BuildProgramItem("https://tv.example.com/new"),
@@ -364,18 +368,18 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateProgramAppearancesAsync_UrlAlreadyInNews_SkipsProgram()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         // ニュースに同URLを先に保存
         await _sut.BatchCreateNewsItemsAsync(new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildNewsItem("https://example.com/both")],
         });
 
         // 同URLで番組を登録しようとする
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildProgramItem("https://example.com/both")],
         };
 
@@ -387,21 +391,21 @@ public class InternalCollectorServiceBatchTests : IDisposable
     }
 
     [Fact]
-    public async Task BatchCreateProgramAppearancesAsync_UrlInNewsOfOtherOshi_SavesProgram()
+    public async Task BatchCreateProgramAppearancesAsync_UrlInNewsOfOtherTalent_SavesProgram()
     {
-        // 別の推しのニュースに同URLがある場合はスキップしない
-        var oshi1 = await AddOshiAsync(userId: 1, name: "推し1");
-        var oshi2 = await AddOshiAsync(userId: 2, name: "推し2");
+        // 別のタレントのニュースに同URLがある場合はスキップしない
+        var talent1 = await AddTalentAsync(userId: 1, displayName: "タレント1");
+        var talent2 = await AddTalentAsync(userId: 2, displayName: "タレント2");
 
         await _sut.BatchCreateNewsItemsAsync(new BatchCreateNewsRequestDto
         {
-            OshiId = oshi1.Id,
+            TalentId = talent1.Id,
             Items = [BuildNewsItem("https://example.com/cross")],
         });
 
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi2.Id,
+            TalentId = talent2.Id,
             Items = [BuildProgramItem("https://example.com/cross")],
         };
 
@@ -414,15 +418,15 @@ public class InternalCollectorServiceBatchTests : IDisposable
     // ── BatchCreateProgramAppearancesAsync: 異常系 ───────────────────────────
 
     [Fact]
-    public async Task BatchCreateProgramAppearancesAsync_OshiNotFound_ThrowsOshiNotFoundException()
+    public async Task BatchCreateProgramAppearancesAsync_TalentNotFound_ThrowsTalentNotFoundException()
     {
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = 99999,
+            TalentId = 99999,
             Items = [BuildProgramItem("https://tv.example.com/x")],
         };
 
-        await Assert.ThrowsAsync<OshiNotFoundException>(() => _sut.BatchCreateProgramAppearancesAsync(dto));
+        await Assert.ThrowsAsync<TalentNotFoundException>(() => _sut.BatchCreateProgramAppearancesAsync(dto));
     }
 
     // ── 境界値 ──────────────────────────────────────────────────────────────
@@ -430,16 +434,16 @@ public class InternalCollectorServiceBatchTests : IDisposable
     [Fact]
     public async Task BatchCreateNewsItemsAsync_AllItemsDuplicated_Returns100PercentSkipped()
     {
-        var oshi = await AddOshiAsync();
+        var talent = await AddTalentAsync();
         await _sut.BatchCreateNewsItemsAsync(new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildNewsItem("https://example.com/a"), BuildNewsItem("https://example.com/b")],
         });
 
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [BuildNewsItem("https://example.com/a"), BuildNewsItem("https://example.com/b")],
         };
 
@@ -461,13 +465,17 @@ public class InternalCollectorServiceBatchTests : IDisposable
             .UseInMemoryDatabase(dbName)
             .Options;
 
-        // oshi を通常 context で事前登録
-        Oshi oshi;
+        // Talent を通常 context で事前登録
+        Talent talent;
         using (var setupDb = new AppDbContext(options))
         {
-            var dbNow = DateTime.UtcNow;
-            oshi = new Oshi { UserId = 1, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
-            setupDb.Oshis.Add(oshi);
+            talent = new Talent
+            {
+                DisplayName = "テストタレント",
+                NormalizedName = "テストタレント",
+                CreatedAt = DateTime.UtcNow,
+            };
+            setupDb.Talents.Add(talent);
             await setupDb.SaveChangesAsync();
         }
 
@@ -481,7 +489,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
 
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [new BatchNewsItemDto
             {
                 Title = "タイトル", SourceUrl = "https://example.com/uniq", CollectedAt = _now,
@@ -505,12 +513,16 @@ public class InternalCollectorServiceBatchTests : IDisposable
             .UseInMemoryDatabase(dbName)
             .Options;
 
-        Oshi oshi;
+        Talent talent;
         using (var setupDb = new AppDbContext(options))
         {
-            var dbNow = DateTime.UtcNow;
-            oshi = new Oshi { UserId = 1, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
-            setupDb.Oshis.Add(oshi);
+            talent = new Talent
+            {
+                DisplayName = "テストタレント",
+                NormalizedName = "テストタレント",
+                CreatedAt = DateTime.UtcNow,
+            };
+            setupDb.Talents.Add(talent);
             await setupDb.SaveChangesAsync();
         }
 
@@ -523,7 +535,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
 
         var dto = new BatchCreateNewsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [new BatchNewsItemDto
             {
                 Title = "タイトル", SourceUrl = "https://example.com/err", CollectedAt = _now,
@@ -542,12 +554,16 @@ public class InternalCollectorServiceBatchTests : IDisposable
             .UseInMemoryDatabase(dbName)
             .Options;
 
-        Oshi oshi;
+        Talent talent;
         using (var setupDb = new AppDbContext(options))
         {
-            var dbNow = DateTime.UtcNow;
-            oshi = new Oshi { UserId = 1, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
-            setupDb.Oshis.Add(oshi);
+            talent = new Talent
+            {
+                DisplayName = "テストタレント",
+                NormalizedName = "テストタレント",
+                CreatedAt = DateTime.UtcNow,
+            };
+            setupDb.Talents.Add(talent);
             await setupDb.SaveChangesAsync();
         }
 
@@ -557,7 +573,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
 
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [new BatchProgramItemDto
             {
                 ProgramName = "番組", SourceUrl = "https://tv.example.com/uniq", CollectedAt = _now,
@@ -578,12 +594,16 @@ public class InternalCollectorServiceBatchTests : IDisposable
             .UseInMemoryDatabase(dbName)
             .Options;
 
-        Oshi oshi;
+        Talent talent;
         using (var setupDb = new AppDbContext(options))
         {
-            var dbNow = DateTime.UtcNow;
-            oshi = new Oshi { UserId = 1, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
-            setupDb.Oshis.Add(oshi);
+            talent = new Talent
+            {
+                DisplayName = "テストタレント",
+                NormalizedName = "テストタレント",
+                CreatedAt = DateTime.UtcNow,
+            };
+            setupDb.Talents.Add(talent);
             await setupDb.SaveChangesAsync();
         }
 
@@ -593,7 +613,7 @@ public class InternalCollectorServiceBatchTests : IDisposable
 
         var dto = new BatchCreateProgramsRequestDto
         {
-            OshiId = oshi.Id,
+            TalentId = talent.Id,
             Items = [new BatchProgramItemDto
             {
                 ProgramName = "番組", SourceUrl = "https://tv.example.com/err", CollectedAt = _now,

@@ -149,7 +149,7 @@ public static class ArticleDeduplicator
             .ToList();
 
         // key: (oshiId, normalizedTitle) → (anchorPublishedAt, List<NewsItem>)
-        var pendingGroups = new List<(int OshiId, string NKey, DateTimeOffset Anchor, List<NewsItem> Members)>();
+        var pendingGroups = new List<(int? OshiId, string NKey, DateTimeOffset Anchor, List<NewsItem> Members)>();
 
         foreach (var item in ascending)
         {
@@ -234,7 +234,7 @@ public static class ArticleDeduplicator
             .ThenBy(p => p.Id)
             .ToList();
 
-        var pendingGroups = new List<(int OshiId, string NKey, DateTimeOffset Anchor, List<ProgramAppearance> Members)>();
+        var pendingGroups = new List<(int? OshiId, string NKey, DateTimeOffset Anchor, List<ProgramAppearance> Members)>();
 
         foreach (var item in ascending)
         {
