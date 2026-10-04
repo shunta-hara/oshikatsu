@@ -9,6 +9,7 @@ import { OshiForm } from "../components/oshi/OshiForm";
 import { OshiList } from "../components/oshi/OshiList";
 import { NewsFeedList } from "../components/feed/NewsFeedList";
 import { ProgramFeedList } from "../components/feed/ProgramFeedList";
+import { TvGuideLinks } from "../components/feed/TvGuideLinks";
 import { OshiFilter } from "../components/feed/OshiFilter";
 import { NotificationBadge } from "../components/feed/NotificationBadge";
 import { CollectorStatus } from "../components/collector/CollectorStatus";
@@ -55,6 +56,12 @@ export function DashboardPage() {
     if (val !== null && /^\d+$/.test(val)) return Number(val);
     return null;
   })();
+
+  // 選択中の推しのオブジェクト（番組表リンクに使う名前の取得用）
+  const selectedOshi =
+    selectedOshiId !== null
+      ? (oshis.find((o) => o.id === selectedOshiId) ?? null)
+      : null;
 
   const fetchDashboard = async () => {
     setIsFetchingDashboard(true);
@@ -286,6 +293,9 @@ export function DashboardPage() {
                   <h3 className="feed-col__heading">
                     出演情報（{programsCount}件）
                   </h3>
+                  {selectedOshi !== null && (
+                    <TvGuideLinks oshiName={selectedOshi.name} />
+                  )}
                   <ProgramFeedList
                     key={String(selectedOshiId)}
                     oshiId={selectedOshiId ?? undefined}

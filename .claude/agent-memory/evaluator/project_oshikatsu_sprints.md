@@ -5,6 +5,14 @@ metadata:
   type: project
 ---
 
+Sprint 30 評価：合格（1回目）。259/259 全テスト通過。FEAT-033（番組表リンク）すべて確認済み。
+
+**Why:** Sprint 30 は FEAT-033（推しごとの番組表検索リンク）。tvGuideUrls.ts + TvGuideLinks.tsx のみ。推し選択時のみ出演情報列に表示。Gガイド・J:COM 両リンクとも target="_blank" / rel="noopener noreferrer"、URLエンコード正常。backend/collector 変更なし。
+
+**How to apply:** Sprint 30 合格。全スプリント完了（FEAT-001〜033）。
+
+---
+
 Sprint 29 評価：合格（1回目）。233/233 全テスト通過。FEAT-032/031(frontend) すべて確認済み。
 
 **Why:** Sprint 29 は FEAT-032（ニュース/出演情報 2カラムレイアウト）・FEAT-031 frontend（ブックマーク絞り込みUI）。feed-two-col が 1024px+ で2列グリッド（computed: 453px 453px）、<1024px でタブ切り替え。role="tablist"/role="tab"/aria-selected 完備。
