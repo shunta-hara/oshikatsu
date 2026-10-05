@@ -14,6 +14,7 @@ import { OshiFilter } from "../components/feed/OshiFilter";
 import { NotificationBadge } from "../components/feed/NotificationBadge";
 import { CollectorStatus } from "../components/collector/CollectorStatus";
 import { OshiCardList } from "../components/dashboard/OshiCardList";
+import { PushNotificationButton } from "../components/push/PushNotificationButton";
 import type { OshiResponse } from "../types/oshi";
 import type { OshiDashboardCard } from "../types/dashboard";
 
@@ -180,6 +181,19 @@ export function DashboardPage() {
               ) : (
                 <OshiList oshis={oshis} onOshiDeleted={handleOshiDeleted} />
               )}
+            </section>
+
+            <section
+              className="section-card"
+              aria-labelledby="push-notification-section-title"
+            >
+              <h2
+                id="push-notification-section-title"
+                className="section-card__title"
+              >
+                プッシュ通知
+              </h2>
+              <PushNotificationButton />
             </section>
 
             <section
