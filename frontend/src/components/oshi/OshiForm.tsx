@@ -52,6 +52,8 @@ export function OshiForm({ onOshiAdded }: OshiFormProps) {
       if (err instanceof ApiError) {
         if (err.status === 422) {
           setApiError("推しの登録は最大20件までです");
+        } else if (err.status === 409) {
+          setApiError("同名の推しはすでに登録されています");
         } else {
           setApiError(err.message);
         }
