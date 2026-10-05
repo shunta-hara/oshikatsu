@@ -1,13 +1,13 @@
 """collector.news_collector のテスト"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from collector.client import BackendClient, BatchResult, NewsBatchItem, OshiInfo
-from collector.news_collector import run_news_collection
+from collector.news_collector import NEWS_RETENTION_DAYS, _is_entry_expired, run_news_collection
 from collector.news_fetcher import NewsEntry, NewsFetcher
 
 _NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
@@ -294,3 +294,165 @@ class TestRunNewsCollection:
         items: list[NewsBatchItem] = client.post_news_batch.call_args.kwargs["items"]
         assert len(items) == 1
         assert items[0].source_name is None
+
+
+class TestIsEntryExpired:
+    """_is_entry_expired のユニットテスト"""
+
+    # ── 正常系 ─────────────────────────────────────────────────────────────────
+
+    def test_not_expired_when_published_at_is_none(self) -> None:
+        """published_at が None の場合は期限切れにならない"""
+        entry = NewsEntry(
+            title="記事",
+            source_url="https://example.com/1",
+            published_at=None,
+            summary=None,
+        )
+        assert not _is_entry_expired(entry, _NOW)
+
+    def test_not_expired_when_published_at_is_recent(self) -> None:
+        """1日前の記事は期限切れにならない"""
+        entry = NewsEntry(
+            title="記事",
+            source_url="https://example.com/1",
+            published_at=_NOW - timedelta(days=1),
+            summary=None,
+        )
+        assert not _is_entry_expired(entry, _NOW)
+
+    def test_expired_when_published_at_is_91_days_old(self) -> None:
+        """91日前の記事は期限切れ"""
+        entry = NewsEntry(
+            title="記事",
+            source_url="https://example.com/1",
+            published_at=_NOW - timedelta(days=91),
+            summary=None,
+        )
+        assert _is_entry_expired(entry, _NOW)
+
+    # ── 境界値 ─────────────────────────────────────────────────────────────────
+
+    def test_expired_when_published_at_is_exactly_retention_days_old(self) -> None:
+        """ちょうど保持期間（90日）前の記事は期限切れ"""
+        entry = NewsEntry(
+            title="記事",
+            source_url="https://example.com/1",
+            published_at=_NOW - timedelta(days=NEWS_RETENTION_DAYS),
+            summary=None,
+        )
+        assert _is_entry_expired(entry, _NOW)
+
+    def test_not_expired_when_published_at_is_one_second_within_retention(self) -> None:
+        """保持期間より1秒以内の記事は期限切れにならない"""
+        entry = NewsEntry(
+            title="記事",
+            source_url="https://example.com/1",
+            published_at=_NOW - timedelta(days=NEWS_RETENTION_DAYS) + timedelta(seconds=1),
+            summary=None,
+        )
+        assert not _is_entry_expired(entry, _NOW)
+
+
+class TestRunNewsCollectionExpiredFilter:
+    """run_news_collection の期限切れフィルタテスト"""
+
+    def test_expired_entry_is_not_sent(self) -> None:
+        """91日前の記事は送信されない"""
+        old_entry = NewsEntry(
+            title="古い記事",
+            source_url="https://example.com/old",
+            published_at=_NOW - timedelta(days=91),
+            summary=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[old_entry])
+
+        with patch("collector.news_collector.datetime") as mock_dt:
+            mock_dt.now.return_value = _NOW
+            run_news_collection(client, fetcher, [_OSHI_A])
+
+        client.post_news_batch.assert_not_called()
+
+    def test_fresh_entry_is_sent(self) -> None:
+        """1日前の記事は送信される"""
+        fresh_entry = NewsEntry(
+            title="新しい記事",
+            source_url="https://example.com/fresh",
+            published_at=_NOW - timedelta(days=1),
+            summary=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[fresh_entry])
+
+        with patch("collector.news_collector.datetime") as mock_dt:
+            mock_dt.now.return_value = _NOW
+            run_news_collection(client, fetcher, [_OSHI_A])
+
+        client.post_news_batch.assert_called_once()
+
+    def test_mixed_entries_only_fresh_sent(self) -> None:
+        """古い記事と新しい記事が混在する場合、新しい記事だけ送信される"""
+        old_entry = NewsEntry(
+            title="古い記事",
+            source_url="https://example.com/old",
+            published_at=_NOW - timedelta(days=91),
+            summary=None,
+        )
+        fresh_entry = NewsEntry(
+            title="新しい記事",
+            source_url="https://example.com/fresh",
+            published_at=_NOW - timedelta(days=1),
+            summary=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[old_entry, fresh_entry])
+
+        with patch("collector.news_collector.datetime") as mock_dt:
+            mock_dt.now.return_value = _NOW
+            run_news_collection(client, fetcher, [_OSHI_A])
+
+        items: list[NewsBatchItem] = client.post_news_batch.call_args.kwargs["items"]
+        assert len(items) == 1
+        assert items[0].source_url == "https://example.com/fresh"
+
+    def test_entry_with_none_published_at_is_sent(self) -> None:
+        """published_at が None の記事は送信される（収集日時が期限内のため）"""
+        entry_no_published_at = NewsEntry(
+            title="日時不明記事",
+            source_url="https://example.com/unknown",
+            published_at=None,
+            summary=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[entry_no_published_at])
+
+        with patch("collector.news_collector.datetime") as mock_dt:
+            mock_dt.now.return_value = _NOW
+            run_news_collection(client, fetcher, [_OSHI_A])
+
+        client.post_news_batch.assert_called_once()
+
+    def test_expired_entries_not_included_in_collected_urls(self) -> None:
+        """期限切れ記事の URL は collected_urls に含まれない"""
+        fresh_entry = NewsEntry(
+            title="新しい記事",
+            source_url="https://example.com/fresh",
+            published_at=_NOW - timedelta(days=1),
+            summary=None,
+        )
+        old_entry = NewsEntry(
+            title="古い記事",
+            source_url="https://example.com/old",
+            published_at=_NOW - timedelta(days=91),
+            summary=None,
+        )
+        client = make_client()
+        fetcher = make_fetcher(entries=[fresh_entry, old_entry])
+
+        with patch("collector.news_collector.datetime") as mock_dt:
+            mock_dt.now.return_value = _NOW
+            result = run_news_collection(client, fetcher, [_OSHI_A])
+
+        assert "https://example.com/fresh" in result[_OSHI_A.id]
+        assert "https://example.com/old" not in result[_OSHI_A.id]

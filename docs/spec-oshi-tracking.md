@@ -507,6 +507,26 @@
   - [ ] `GET /api/v1/news?oshiId={user_oshi_id}` によるフィルタが引き続き正しく動作する
   - [ ] 既存の Vitest テストが引き続きパスする（API モックのレスポンス形状の更新のみ可）
 
+### FEAT-043: 古い記事の自動削除
+- **優先度**: Should
+- **説明**: `news_items` が増え続けて DB を圧迫する問題を解消するため、公開日（`PublishedAt`）から 90 日を超えた記事を定期的に自動削除する。`PublishedAt` が null の場合は収集日時（`CollectedAt`）を基準とする。ユーザーにブックマークされている記事は削除しない。backend が削除の正本として X-Api-Key 認証付きの内部 API を公開し、既存の Cloudflare Workers（scheduler/）の Cron Triggers が週 1 回このエンドポイントを直接呼び出す。collector は収集時に 90 日より古い記事を登録しないことで削除した記事の再登録を防ぐ。
+- **受け入れ基準**:
+  - [ ] `PublishedAt` が現在時刻から 90 日以前の記事が削除対象になる（FEAT-043）
+  - [ ] `PublishedAt` が null かつ `CollectedAt` が 90 日以前の記事が削除対象になる（FEAT-043）
+  - [ ] ブックマーク済みの記事は保持期間を超えていても削除対象から除外される（FEAT-043）
+  - [ ] 1 回の実行で削除できる件数に上限を設け、大量レコードが溜まっている場合でもロックが長引かない（FEAT-043）
+  - [ ] `DELETE /api/v1/internal/news/expired` エンドポイントが存在し、`X-Api-Key` ヘッダーで保護されている（FEAT-043）
+  - [ ] エンドポイントが削除した件数を JSON で返す（FEAT-043）
+  - [ ] Swagger にこの削除エンドポイントが定義されている（FEAT-043）
+  - [ ] `news_items.published_at` にインデックスを追加するマイグレーションが `dotnet ef database update` で適用できる（FEAT-043）
+  - [ ] collector が収集時に `publishedAt` が 90 日より前の記事を backend へ送信しない（FEAT-043）
+  - [ ] Cloudflare Workers（`scheduler/`）の Cron Triggers が週 1 回（例: 毎週月曜 0:00 UTC）このエンドポイントを呼び出す設定が追加されている（FEAT-043）
+  - [ ] scheduler のコードが GitHub workflow_dispatch の呼び出しに加えて削除エンドポイントの呼び出しも担う形に更新されている（FEAT-043）
+  - [ ] `.claude/rules/architecture.md` の scheduler の役割説明が削除エンドポイントの呼び出しを含む記述に更新されている（FEAT-043）
+  - [ ] 削除の実行結果（削除件数・成功/失敗）が scheduler および backend のログに出力される（FEAT-043）
+  - [ ] 削除実行が `CollectorJobLog` に記録される（FEAT-043）
+  - [ ] `dotnet test backend`、`npm test`（`scheduler/`）、`pytest collector` が正常にパスする（FEAT-043）
+
 ---
 
 ## タレントモデル導入 — 層間 API 契約
@@ -1030,6 +1050,28 @@
   - [ ] `DELETE /api/v1/oshis/{id}` 後、ダッシュボードからその推しカードが消える（FEAT-042）
   - [ ] `GET /api/v1/news?oshiId=X` によるフィルタが引き続き正しく動作する（FEAT-042）
   - [ ] 既存の Vitest テストが引き続きパスする（FEAT-042）
+
+### Sprint 41: 古い記事の定期自動削除
+- **対象機能**: FEAT-043
+- **主体層**: backend（削除 API・インデックス追加マイグレーション）→ scheduler（週次呼び出し・architecture.md 更新）→ collector（登録フィルタ）
+- **前提**: Sprint 40 が完了していること
+- **実装順序**: 層をまたぐため、backend の削除 API とマイグレーションを先に実装・確認してから、scheduler の Cron Triggers 追加と collector のフィルタ追加を行う
+- **完了条件**:
+  - [ ] `news_items.published_at` にインデックスを追加するマイグレーションが適用されている（FEAT-043）
+  - [ ] `DELETE /api/v1/internal/news/expired` が実装されており、`X-Api-Key` 認証と 1 回あたりの削除上限が機能する（FEAT-043）
+  - [ ] `PublishedAt` が 90 日より前の記事が削除される（FEAT-043）
+  - [ ] `PublishedAt` が null かつ `CollectedAt` が 90 日より前の記事が削除される（FEAT-043）
+  - [ ] ブックマーク済みの記事が削除されない（FEAT-043）
+  - [ ] エンドポイントが削除件数を JSON で返す（FEAT-043）
+  - [ ] Swagger に削除エンドポイントが定義されている（FEAT-043）
+  - [ ] 削除実行が `CollectorJobLog` に記録され、実行結果がログに出力される（FEAT-043）
+  - [ ] `dotnet test backend` が正常にパスする（FEAT-043）
+  - [ ] scheduler の Cron Triggers に週 1 回の削除エンドポイント呼び出しが追加されている（FEAT-043）
+  - [ ] scheduler のテストで削除エンドポイント呼び出しの正常系・エラー系（5xx・認証失敗）が確認できる（FEAT-043）
+  - [ ] `.claude/rules/architecture.md` の scheduler の役割説明が更新されている（FEAT-043）
+  - [ ] `npm test`（`scheduler/`）が正常にパスする（FEAT-043）
+  - [ ] collector が `publishedAt` が 90 日より前の記事を送信しない（FEAT-043）
+  - [ ] `pytest collector` が正常にパスする（FEAT-043）
 
 ---
 

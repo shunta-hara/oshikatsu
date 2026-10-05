@@ -4,13 +4,29 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from collector.client import BackendClient, NewsBatchItem, OshiInfo
 from collector.logger import get_logger
-from collector.news_fetcher import NewsFetcher
+from collector.news_fetcher import NewsEntry, NewsFetcher
 
 logger = get_logger(__name__)
+
+# 保持期間（日数）。この日数より古い記事は送信しない
+NEWS_RETENTION_DAYS = 90
+
+
+def _is_entry_expired(entry: "NewsEntry", now: datetime) -> bool:
+    """
+    エントリが保持期間切れかどうかを判定する。
+
+    published_at が None の場合は収集日時（collected_at）が now に近いため
+    期限切れにならない（False を返す）。
+    """
+    if entry.published_at is None:
+        return False
+    cutoff = now - timedelta(days=NEWS_RETENTION_DAYS)
+    return entry.published_at <= cutoff
 
 
 def run_news_collection(
@@ -65,6 +81,20 @@ def run_news_collection(
             logger.info("取得記事なし: 推し='%s'", oshi.name)
             continue
 
+        # 保持期間より古い記事は送信しない（削除された記事の再登録を防ぐ）
+        now_for_filter = datetime.now(timezone.utc)
+        fresh_entries = [e for e in entries if not _is_entry_expired(e, now_for_filter)]
+        expired_count = len(entries) - len(fresh_entries)
+        if expired_count > 0:
+            logger.info(
+                "期限切れ記事をスキップ: %d件 (推し: '%s')",
+                expired_count,
+                oshi.name,
+            )
+        if not fresh_entries:
+            logger.info("有効な記事なし（全件期限切れ）: 推し='%s'", oshi.name)
+            continue
+
         collected_at = datetime.now(timezone.utc)
         batch_items = [
             NewsBatchItem(
@@ -75,7 +105,7 @@ def run_news_collection(
                 published_at=entry.published_at,
                 source_name=entry.source_name,
             )
-            for entry in entries
+            for entry in fresh_entries
         ]
 
         # 一括 API で1回送信
@@ -102,7 +132,7 @@ def run_news_collection(
             continue
 
         # 収集した URL を記録（番組収集での重複排除に使用）
-        collected_urls[oshi.id] = {entry.source_url for entry in entries}
+        collected_urls[oshi.id] = {entry.source_url for entry in fresh_entries}
 
     logger.info(
         "ニュース収集バッチ完了 - 新規保存: %d件, 重複スキップ: %d件, 失敗: %d件",

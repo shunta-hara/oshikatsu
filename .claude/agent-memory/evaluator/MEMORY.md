@@ -1,3 +1,3 @@
 # Evaluator Agent Memory Index
 
-- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — Sprint 32（FEAT-035/036 転載重複まとめ・媒体名）合格（1回目）。全スプリント（1〜32）完了
+- [Oshikatsu Project Sprint History](project_oshikatsu_sprints.md) — Sprint 40（FEAT-042 frontend 推し登録調整）合格（1回目）。Sprint 37〜40 すべて完了

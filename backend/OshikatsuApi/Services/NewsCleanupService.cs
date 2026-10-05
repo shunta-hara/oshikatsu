@@ -25,26 +25,25 @@ public class NewsCleanupService : INewsCleanupService
     {
         var cutoff = DateTimeOffset.UtcNow.AddDays(-RetentionDays);
 
-        // ブックマーク済みの記事 ID を除外しながら削除対象を取得する
-        var expiredIds = await _db.NewsItems
+        // ブックマーク済みの記事を除外しながら削除対象エンティティを取得する
+        var itemsToDelete = await _db.NewsItems
             .Where(n =>
                 (n.PublishedAt.HasValue && n.PublishedAt.Value <= cutoff) ||
                 (!n.PublishedAt.HasValue && n.CollectedAt <= cutoff))
             .Where(n => !_db.Bookmarks.Any(b => b.NewsItemId == n.Id))
-            .Select(n => n.Id)
             .Take(batchSize)
             .ToListAsync();
 
-        if (expiredIds.Count == 0)
+        if (itemsToDelete.Count == 0)
         {
             _logger.LogInformation("削除対象の記事はありませんでした。");
             await RecordCleanupLogAsync(0);
             return 0;
         }
 
-        var deletedCount = await _db.NewsItems
-            .Where(n => expiredIds.Contains(n.Id))
-            .ExecuteDeleteAsync();
+        _db.NewsItems.RemoveRange(itemsToDelete);
+        await _db.SaveChangesAsync();
+        var deletedCount = itemsToDelete.Count;
 
         _logger.LogInformation(
             "古い記事の削除完了: {DeletedCount}件削除（cutoff={Cutoff:O}）",

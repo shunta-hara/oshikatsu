@@ -3,12 +3,21 @@ export interface Env {
   GITHUB_WORKFLOW_FILE: string;
   GITHUB_REF: string;
   GITHUB_DISPATCH_TOKEN: string;
+  /** backend API のベース URL（例: https://oshikatsu-api.onrender.com）*/
+  BACKEND_API_URL: string;
+  /** backend 内部 API キー（X-Api-Key ヘッダーに設定する）*/
+  BACKEND_API_KEY: string;
 }
 
-interface DispatchOptions {
+interface RetryOptions {
   maxRetries?: number;
   sleepFn?: (ms: number) => Promise<void>;
   timeoutMs?: number;
+}
+
+/** 期限切れ記事削除 API のレスポンス */
+export interface DeleteExpiredNewsResult {
+  deletedCount: number;
 }
 
 const DEFAULT_MAX_RETRIES = 3;
@@ -25,7 +34,7 @@ function buildUrl(repo: string, workflowFile: string): string {
  */
 export async function dispatchWorkflow(
   env: Env,
-  options: DispatchOptions = {},
+  options: RetryOptions = {},
 ): Promise<void> {
   const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const timeoutMs = options.timeoutMs ?? 10_000;
@@ -102,18 +111,135 @@ export async function dispatchWorkflow(
   }
 }
 
+/**
+ * backend の期限切れ記事削除エンドポイントを呼び出す。
+ * 一時的なエラー（5xx・429・ネットワーク失敗）は最大 maxRetries 回リトライする。
+ * 4xx（429 以外）は再試行しない。
+ * 削除件数を含む結果オブジェクトを返す。
+ */
+export async function deleteExpiredNews(
+  env: Env,
+  options: RetryOptions = {},
+): Promise<DeleteExpiredNewsResult> {
+  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const timeoutMs = options.timeoutMs ?? 30_000;
+  const sleep =
+    options.sleepFn ??
+    ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  const url = `${env.BACKEND_API_URL.replace(/\/+$/, "")}/api/v1/internal/news/expired`;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      const delayMs = Math.pow(2, attempt - 1) * BASE_DELAY_MS;
+      console.log(
+        `[scheduler] deleteExpiredNews retry ${attempt}/${maxRetries} (waiting ${delayMs}ms)`,
+      );
+      await sleep(delayMs);
+    }
+
+    let status: number;
+    let body: string;
+    try {
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+        method: "DELETE",
+        headers: {
+          "X-Api-Key": env.BACKEND_API_KEY,
+          "Content-Type": "application/json",
+        },
+      });
+      status = res.status;
+      body = await res.text();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (attempt < maxRetries) {
+        console.warn(
+          `[scheduler] deleteExpiredNews attempt ${attempt + 1} network error: ${message}`,
+        );
+        continue;
+      }
+      console.error(
+        `[scheduler] deleteExpiredNews failed after ${maxRetries + 1} attempts (network): ${message}`,
+      );
+      throw err instanceof Error ? err : new Error(message);
+    }
+
+    if (status >= 200 && status < 300) {
+      let deletedCount = 0;
+      try {
+        const json = JSON.parse(body) as { deletedCount?: number };
+        deletedCount = json.deletedCount ?? 0;
+      } catch {
+        // JSON パース失敗は無視してカウント 0 扱い
+      }
+      console.log(
+        `[scheduler] deleteExpiredNews succeeded: deletedCount=${deletedCount}`,
+      );
+      return { deletedCount };
+    }
+
+    const isRetryable = status === 429 || status >= 500;
+    if (!isRetryable) {
+      console.error(
+        `[scheduler] deleteExpiredNews non-retryable HTTP status: ${status}`,
+      );
+      throw new Error(
+        `deleteExpiredNews returned non-retryable status: ${status}`,
+      );
+    }
+
+    if (attempt < maxRetries) {
+      console.warn(
+        `[scheduler] deleteExpiredNews attempt ${attempt + 1} received HTTP ${status}, will retry`,
+      );
+      continue;
+    }
+
+    console.error(
+      `[scheduler] deleteExpiredNews failed after ${maxRetries + 1} attempts (last status: ${status})`,
+    );
+    throw new Error(
+      `deleteExpiredNews returned ${status} after ${maxRetries + 1} attempts`,
+    );
+  }
+
+  // unreachable; satisfies TypeScript
+  throw new Error("deleteExpiredNews: unexpected loop exit");
+}
+
+/** 毎週月曜 0:00 UTC の削除 Cron の cron 式 */
+const CLEANUP_CRON = "0 0 * * 1";
+
 export default {
   async scheduled(
-    _event: ScheduledController,
+    event: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
-    console.log(`[scheduler] cron triggered at ${new Date().toISOString()}`);
-    try {
-      await dispatchWorkflow(env);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.error(`[scheduler] cron handler failed: ${message}`);
+    console.log(
+      `[scheduler] cron triggered at ${new Date().toISOString()} (cron="${event.cron}")`,
+    );
+
+    if (event.cron === CLEANUP_CRON) {
+      // 週次: 期限切れ記事の削除
+      try {
+        const result = await deleteExpiredNews(env);
+        console.log(
+          `[scheduler] cleanup cron completed: deletedCount=${result.deletedCount}`,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[scheduler] cleanup cron failed: ${message}`);
+      }
+    } else {
+      // 2時間ごと: コレクターワークフローのディスパッチ
+      try {
+        await dispatchWorkflow(env);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[scheduler] cron handler failed: ${message}`);
+      }
     }
   },
 } satisfies ExportedHandler<Env>;

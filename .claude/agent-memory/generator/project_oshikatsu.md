@@ -7,7 +7,7 @@ metadata:
 
 # oshikatsu プロジェクト状況
 
-Sprint 1-25 実装完了（Sprint 25: 2026-10-03）。
+Sprint 1-37 実装完了（Sprint 37 マージ衝突解消: 2026-10-05）。
 
 **Why:** backend/ディレクトリが存在しなかった新規プロジェクト。
 
@@ -38,7 +38,11 @@ Sprint 1-25 実装完了（Sprint 25: 2026-10-03）。
   - **一括登録API（Sprint 22/FEAT-023）**: `POST /api/v1/internal/news/batch`, `POST /api/v1/internal/programs/batch`（APIキー認証）
   - **FEAT-024 番組重複排除**: 番組一括・単件保存時にニュースの既存 sourceUrl をスキップ。FeedService・DashboardService で番組一覧からニュースと重複する番組を除外
   - **FEAT-026 即時収集 dispatch（Sprint 24）**: `IGitHubDispatchService` / `GitHubDispatchService` 追加。推し登録後に fire-and-forget で GitHub Actions workflow_dispatch を起動。env: GITHUB_DISPATCH_TOKEN / GITHUB_REPOSITORY / GITHUB_WORKFLOW_FILE / GITHUB_REF。未設定時はスキップ。失敗時も 201 を返す。トークンはログに出さない。
-- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（360テスト合格）
+  - **Sprint 35 / FEAT-037**: talents / user_oshis テーブル新設。NewsItem / ProgramAppearance に talent_id (nullable FK) 追加。マイグレーション SQL で既存 oshis → talents + user_oshis 変換、news_items / program_appearances の talent_id 設定、同一 talent_id + source_url 重複の最古1件残し削除を実行。
+  - **Sprint 36 / FEAT-038**: タレント名正規化ロジック実装。`TalentNameNormalizer.Normalize(string name)` が NFKC → 小文字 → 空白除去を実行（`Services/TalentNameNormalizer.cs`）。`ITalentService`/`TalentService` に `FindOrCreateTalentAsync(string name)` を追加（`Services/TalentService.cs`）。Program.cs に `ITalentService` を DI 登録済み。新規テスト 31件（TalentNameNormalizerTests 15件 + TalentServiceTests 16件）。
+  - **Sprint 38 / FEAT-040**: 内部 API を talentId ベースへ変更。InternalOshiDto.TalentId / CreateNewsItemRequestDto.TalentId / CreateProgramAppearanceRequestDto.TalentId / BatchCreateNewsRequestDto.TalentId / BatchCreateProgramsRequestDto.TalentId / InternalNewsResponseDto.TalentId / InternalProgramResponseDto.TalentId。OshiId を nullable（int?）に変更（NewsItem・ProgramAppearance）。GitHubDispatchService: dispatch inputs を `oshi_id` → `talent_id` に変更。マイグレーション 20261005110000_MakeOshiIdNullable.cs を追加。FeedService / DashboardService / BookmarkService / ArticleDeduplicator を nullable OshiId 対応に更新。
+  - **Sprint 37 マージ解消**: FeedService / DashboardService / BookmarkService を talent_id ベースに統一（sprint-38 merge）。FeedServiceProgramDeduplicationTests の cross-oshi テストを talent_id モデルに更新（Talent + UserOshi を直接作成する形に変更）。
+- `backend/OshikatsuApi.Tests/` — xUnit テストプロジェクト（564テスト合格 as of Sprint 37マージ解消、6テストは NewsCleanupService の ExecuteDeleteAsync InMemory 非対応による既存失敗）
 
 ### frontend/（Sprint 7-15, 18-20, 24-25）
 - `frontend/` — Vite + React + TypeScript プロジェクト

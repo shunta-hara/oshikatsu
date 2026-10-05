@@ -1,17 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dispatchWorkflow, type Env } from "./index";
+import { deleteExpiredNews, dispatchWorkflow, type Env } from "./index";
 
 const mockEnv: Env = {
   GITHUB_REPOSITORY: "owner/repo",
   GITHUB_WORKFLOW_FILE: "collect.yml",
   GITHUB_REF: "master",
   GITHUB_DISPATCH_TOKEN: "test-token-secret",
+  BACKEND_API_URL: "https://api.example.com",
+  BACKEND_API_KEY: "test-api-key",
 };
 
 const noopSleep = (): Promise<void> => Promise.resolve();
 
-function mockResponse(status: number): Response {
-  return { status } as unknown as Response;
+function mockResponse(status: number, body = ""): Response {
+  return {
+    status,
+    text: () => Promise.resolve(body),
+  } as unknown as Response;
 }
 
 describe("dispatchWorkflow", () => {
@@ -234,5 +239,176 @@ describe("dispatchWorkflow", () => {
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deleteExpiredNews
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("deleteExpiredNews", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // 正常系
+
+  it("200 が返ったとき削除件数を返す", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse(200, JSON.stringify({ deletedCount: 42 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    expect(result.deletedCount).toBe(42);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("正しい URL・メソッド・ヘッダーで fetch を呼ぶ", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse(200, JSON.stringify({ deletedCount: 0 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.example.com/api/v1/internal/news/expired");
+    expect(init.method).toBe("DELETE");
+    const headers = init.headers as Record<string, string>;
+    expect(headers["X-Api-Key"]).toBe("test-api-key");
+  });
+
+  it("削除件数 0 でも正常に返す", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse(200, JSON.stringify({ deletedCount: 0 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    expect(result.deletedCount).toBe(0);
+  });
+
+  it("BACKEND_API_URL の末尾スラッシュを除去してパスを組み立てる", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValue(
+        mockResponse(200, JSON.stringify({ deletedCount: 1 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const envWithSlash: Env = {
+      ...mockEnv,
+      BACKEND_API_URL: "https://api.example.com/",
+    };
+    await deleteExpiredNews(envWithSlash, { sleepFn: noopSleep });
+
+    const [url] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.example.com/api/v1/internal/news/expired");
+  });
+
+  // リトライ: 5xx
+
+  it("5xx の後に 200 が返ったときリトライして成功する", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse(503))
+      .mockResolvedValueOnce(
+        mockResponse(200, JSON.stringify({ deletedCount: 3 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    expect(result.deletedCount).toBe(3);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("429 の後に 200 が返ったときリトライして成功する", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockResolvedValueOnce(mockResponse(429))
+      .mockResolvedValueOnce(
+        mockResponse(200, JSON.stringify({ deletedCount: 1 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    expect(result.deletedCount).toBe(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("ネットワークエラーの後に 200 が返ったときリトライして成功する", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("Network failure"))
+      .mockResolvedValueOnce(
+        mockResponse(200, JSON.stringify({ deletedCount: 0 })),
+      );
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await deleteExpiredNews(mockEnv, { sleepFn: noopSleep });
+
+    expect(result.deletedCount).toBe(0);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  // 異常系: 非リトライ
+
+  it("401 では再試行せずエラーをスローする", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockResponse(401));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      deleteExpiredNews(mockEnv, { sleepFn: noopSleep }),
+    ).rejects.toThrow("non-retryable status: 401");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("403 では再試行せずエラーをスローする", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockResponse(403));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      deleteExpiredNews(mockEnv, { sleepFn: noopSleep }),
+    ).rejects.toThrow("non-retryable status: 403");
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  // 境界値: 最大リトライ後も失敗
+
+  it("5xx が続いて最大3回リトライ後も失敗するとエラーをスローする", async () => {
+    const mockFetch = vi.fn().mockResolvedValue(mockResponse(503));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      deleteExpiredNews(mockEnv, { sleepFn: noopSleep, maxRetries: 3 }),
+    ).rejects.toThrow("after 4 attempts");
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+  });
+
+  it("ネットワークエラーが続いて最大3回リトライ後も失敗するとエラーをスローする", async () => {
+    const mockFetch = vi
+      .fn()
+      .mockRejectedValue(new Error("Connection refused"));
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(
+      deleteExpiredNews(mockEnv, { sleepFn: noopSleep, maxRetries: 3 }),
+    ).rejects.toThrow("Connection refused");
+    expect(mockFetch).toHaveBeenCalledTimes(4);
   });
 });
