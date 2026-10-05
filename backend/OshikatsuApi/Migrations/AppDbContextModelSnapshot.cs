@@ -290,6 +290,10 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("text")
                         .HasColumnName("endpoint");
 
+                    b.Property<DateTimeOffset?>("LastNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_notified_at");
+
                     b.Property<string>("P256dh")
                         .IsRequired()
                         .HasColumnType("text")

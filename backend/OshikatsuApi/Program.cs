@@ -126,6 +126,10 @@ builder.Services.AddScoped<INewsCleanupService, NewsCleanupService>();
 // Web Push 購読管理サービス
 builder.Services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
 
+// Web Push 通知送信サービス（FEAT-045）
+builder.Services.AddScoped<IWebPushClient, WebPushClientWrapper>();
+builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
+
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 

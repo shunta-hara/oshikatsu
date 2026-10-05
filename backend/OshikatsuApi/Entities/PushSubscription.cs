@@ -24,6 +24,9 @@ public class PushSubscription
     /// <summary>購読登録日時（UTC）</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>最後に Push 通知を送信した日時（UTC）。null は一度も送信していない</summary>
+    public DateTimeOffset? LastNotifiedAt { get; set; }
+
     // Navigation
     public User User { get; set; } = null!;
 }

@@ -270,6 +270,7 @@ public class AppDbContext : DbContext
                   .HasColumnName("auth")
                   .IsRequired();
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.LastNotifiedAt).HasColumnName("last_notified_at");
 
             entity.HasOne(e => e.User)
                   .WithMany()
