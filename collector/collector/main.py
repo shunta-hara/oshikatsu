@@ -45,21 +45,21 @@ def main() -> None:
         logger.info("登録済みの推しが 0 件です。収集をスキップします。")
         return
 
-    # OSHI_ID が指定された場合は対象を1人に絞る
+    # TALENT_ID が指定された場合は対象を1人に絞る
     target_oshis = all_oshis
-    if config.oshi_id is not None:
-        target_oshis = [o for o in all_oshis if o.id == config.oshi_id]
+    if config.talent_id is not None:
+        target_oshis = [o for o in all_oshis if o.talent_id == config.talent_id]
         if not target_oshis:
             logger.warning(
-                "指定した推し (OSHI_ID=%d) が見つかりません。収集をスキップします。",
-                config.oshi_id,
+                "指定したタレント (TALENT_ID=%d) が見つかりません。収集をスキップします。",
+                config.talent_id,
             )
             return
 
     logger.info(
-        "収集対象: %d 件の推し%s",
+        "収集対象: %d 件のタレント%s",
         len(target_oshis),
-        f" (OSHI_ID={config.oshi_id})" if config.oshi_id is not None else "",
+        f" (TALENT_ID={config.talent_id})" if config.talent_id is not None else "",
     )
 
     news_fetcher = NewsFetcher(

@@ -7,15 +7,15 @@ on:
     - cron: '17 */2 * * *'
   workflow_dispatch:
     inputs:
-      oshi_id:
-        description: '特定の推しのみ収集する場合に推し ID（数字）を指定する。空の場合は全推し対象。'
+      talent_id:
+        description: '特定のタレントのみ収集する場合にタレント ID（数字）を指定する。空の場合は全タレント対象。'
         required: false
         default: ''
 
-# 全体収集（oshi_id なし）は同時実行しない。
-# 特定推しの収集は同じ推し ID どうしのみ同時実行しない（異なる推しは独立して動く）。
+# 全体収集（talent_id なし）は同時実行しない。
+# 特定タレントの収集は同じタレント ID どうしのみ同時実行しない（異なるタレントは独立して動く）。
 concurrency:
-  group: ${{ inputs.oshi_id != '' && format('collect-oshi-{0}', inputs.oshi_id) || 'collect-all' }}
+  group: ${{ inputs.talent_id != '' && format('collect-talent-{0}', inputs.talent_id) || 'collect-all' }}
   cancel-in-progress: false
 
 jobs:
@@ -42,6 +42,6 @@ jobs:
         env:
           BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
           COLLECTOR_API_KEY: ${{ secrets.COLLECTOR_API_KEY }}
-          OSHI_ID: ${{ inputs.oshi_id }}
+          TALENT_ID: ${{ inputs.talent_id }}
         run: python -m collector
         working-directory: collector

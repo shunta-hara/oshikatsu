@@ -80,49 +80,49 @@ class TestCollectorConfig:
             load_config()
 
 
-class TestOshiId:
-    """OSHI_ID 環境変数のテスト"""
+class TestTalentId:
+    """TALENT_ID 環境変数のテスト（FEAT-041: OSHI_ID から変更）"""
 
-    def test_oshi_id_not_set_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_talent_id_not_set_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKEND_BASE_URL", "http://localhost:8080")
         monkeypatch.setenv("COLLECTOR_API_KEY", "key")
-        monkeypatch.delenv("OSHI_ID", raising=False)
+        monkeypatch.delenv("TALENT_ID", raising=False)
 
         config = load_config()
 
-        assert config.oshi_id is None
+        assert config.talent_id is None
 
-    def test_oshi_id_set_to_integer_is_parsed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_talent_id_set_to_integer_is_parsed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKEND_BASE_URL", "http://localhost:8080")
         monkeypatch.setenv("COLLECTOR_API_KEY", "key")
-        monkeypatch.setenv("OSHI_ID", "42")
+        monkeypatch.setenv("TALENT_ID", "42")
 
         config = load_config()
 
-        assert config.oshi_id == 42
+        assert config.talent_id == 42
 
-    def test_oshi_id_empty_string_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_talent_id_empty_string_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKEND_BASE_URL", "http://localhost:8080")
         monkeypatch.setenv("COLLECTOR_API_KEY", "key")
-        monkeypatch.setenv("OSHI_ID", "")
+        monkeypatch.setenv("TALENT_ID", "")
 
         config = load_config()
 
-        assert config.oshi_id is None
+        assert config.talent_id is None
 
-    def test_oshi_id_non_integer_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_talent_id_non_integer_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("BACKEND_BASE_URL", "http://localhost:8080")
         monkeypatch.setenv("COLLECTOR_API_KEY", "key")
-        monkeypatch.setenv("OSHI_ID", "abc")
+        monkeypatch.setenv("TALENT_ID", "abc")
 
-        with pytest.raises(ValueError, match="OSHI_ID"):
+        with pytest.raises(ValueError, match="TALENT_ID"):
             load_config()
 
-    def test_oshi_id_float_string_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_talent_id_float_string_raises_value_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """小数点付き文字列はエラーになる"""
         monkeypatch.setenv("BACKEND_BASE_URL", "http://localhost:8080")
         monkeypatch.setenv("COLLECTOR_API_KEY", "key")
-        monkeypatch.setenv("OSHI_ID", "1.5")
+        monkeypatch.setenv("TALENT_ID", "1.5")
 
-        with pytest.raises(ValueError, match="OSHI_ID"):
+        with pytest.raises(ValueError, match="TALENT_ID"):
             load_config()

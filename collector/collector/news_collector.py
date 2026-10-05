@@ -44,25 +44,25 @@ def run_news_collection(
     total_failed = 0
 
     for oshi in oshis:
-        logger.info("収集開始: '%s' (id=%d)", oshi.name, oshi.id)
+        logger.info("収集開始: '%s' (talent_id=%d)", oshi.name, oshi.talent_id)
 
         # ニュース記事をフィードから収集
         try:
             entries = fetcher.fetch_for_oshi(oshi.name)
         except Exception as exc:
             logger.error(
-                "ニュース収集失敗: 推し='%s' (id=%d): %s",
+                "ニュース収集失敗: タレント='%s' (talent_id=%d): %s",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 exc,
             )
             total_failed += 1
             continue
 
-        logger.info("取得記事数: %d (推し: '%s')", len(entries), oshi.name)
+        logger.info("取得記事数: %d (タレント: '%s')", len(entries), oshi.name)
 
         if not entries:
-            logger.info("取得記事なし: 推し='%s'", oshi.name)
+            logger.info("取得記事なし: タレント='%s'", oshi.name)
             continue
 
         collected_at = datetime.now(timezone.utc)
@@ -80,29 +80,29 @@ def run_news_collection(
 
         # 一括 API で1回送信
         try:
-            result = client.post_news_batch(oshi_id=oshi.id, items=batch_items)
+            result = client.post_news_batch(talent_id=oshi.talent_id, items=batch_items)
             total_saved += result.saved_count
             total_skipped += result.skipped_count
             logger.info(
-                "収集完了: 推し='%s' (id=%d) - 受信: %d件, 新規保存: %d件, 重複スキップ: %d件",
+                "収集完了: タレント='%s' (talent_id=%d) - 受信: %d件, 新規保存: %d件, 重複スキップ: %d件",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 result.received_count,
                 result.saved_count,
                 result.skipped_count,
             )
         except Exception as exc:
             logger.error(
-                "一括送信失敗: 推し='%s' (id=%d): %s",
+                "一括送信失敗: タレント='%s' (talent_id=%d): %s",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 exc,
             )
             total_failed += 1
             continue
 
         # 収集した URL を記録（番組収集での重複排除に使用）
-        collected_urls[oshi.id] = {entry.source_url for entry in entries}
+        collected_urls[oshi.talent_id] = {entry.source_url for entry in entries}
 
     logger.info(
         "ニュース収集バッチ完了 - 新規保存: %d件, 重複スキップ: %d件, 失敗: %d件",

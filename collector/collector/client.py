@@ -22,9 +22,9 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 
 @dataclass
 class OshiInfo:
-    """推し情報（backend 内部 API から取得）"""
+    """タレント情報（backend 内部 API から取得）"""
 
-    id: int
+    talent_id: int
     name: str
 
 
@@ -95,19 +95,19 @@ class BackendClient:
             if not isinstance(item, dict):
                 logger.warning("Unexpected oshi item format: %r", item)
                 continue
-            oshi_id = item.get("id")
+            talent_id = item.get("talentId")
             name = item.get("name")
-            if not isinstance(oshi_id, int) or not isinstance(name, str):
-                logger.warning("Malformed oshi data (id=%r, name=%r), skipping.", oshi_id, name)
+            if not isinstance(talent_id, int) or not isinstance(name, str):
+                logger.warning("Malformed talent data (talentId=%r, name=%r), skipping.", talent_id, name)
                 continue
-            result.append(OshiInfo(id=oshi_id, name=name))
+            result.append(OshiInfo(talent_id=talent_id, name=name))
 
         return result
 
     def post_news_item(
         self,
         *,
-        oshi_id: int,
+        talent_id: int,
         title: str,
         source_url: str,
         collected_at: datetime,
@@ -115,13 +115,13 @@ class BackendClient:
         published_at: datetime | None = None,
     ) -> dict[str, Any]:
         """
-        ニュースアイテムを backend に送信する（単件 API、後方互換のために残す）。
+        ニュースアイテムを backend に送信する（単件 API）。
 
         published_at が None の場合は backend 側で collected_at で代替され、
         is_published_at_estimated が True になる。
         """
         payload: dict[str, Any] = {
-            "oshiId": oshi_id,
+            "talentId": talent_id,
             "title": title,
             "sourceUrl": source_url,
             "collectedAt": _to_iso(collected_at),
@@ -136,7 +136,7 @@ class BackendClient:
     def post_news_batch(
         self,
         *,
-        oshi_id: int,
+        talent_id: int,
         items: list[NewsBatchItem],
     ) -> BatchResult:
         """
@@ -160,7 +160,7 @@ class BackendClient:
                 entry["sourceName"] = item.source_name
             items_payload.append(entry)
 
-        payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}
+        payload: dict[str, Any] = {"talentId": talent_id, "items": items_payload}
         raw = self._post_with_retry("/api/v1/internal/news/batch", payload)
         return BatchResult(
             received_count=raw.get("receivedCount", 0),
@@ -192,7 +192,7 @@ class BackendClient:
     def post_program_appearance(
         self,
         *,
-        oshi_id: int,
+        talent_id: int,
         program_name: str,
         source_url: str,
         collected_at: datetime,
@@ -200,13 +200,13 @@ class BackendClient:
         aired_at: datetime | None = None,
     ) -> dict[str, Any]:
         """
-        出演番組情報を backend に送信する（単件 API、後方互換のために残す）。
+        出演番組情報を backend に送信する（単件 API）。
 
         aired_at が None の場合は backend 側で collected_at で代替され、
         is_aired_at_estimated が True になる。
         """
         payload: dict[str, Any] = {
-            "oshiId": oshi_id,
+            "talentId": talent_id,
             "programName": program_name,
             "sourceUrl": source_url,
             "collectedAt": _to_iso(collected_at),
@@ -221,7 +221,7 @@ class BackendClient:
     def post_program_batch(
         self,
         *,
-        oshi_id: int,
+        talent_id: int,
         items: list[ProgramBatchItem],
     ) -> BatchResult:
         """
@@ -245,7 +245,7 @@ class BackendClient:
                 entry["sourceName"] = item.source_name
             items_payload.append(entry)
 
-        payload: dict[str, Any] = {"oshiId": oshi_id, "items": items_payload}
+        payload: dict[str, Any] = {"talentId": talent_id, "items": items_payload}
         raw = self._post_with_retry("/api/v1/internal/programs/batch", payload)
         return BatchResult(
             received_count=raw.get("receivedCount", 0),

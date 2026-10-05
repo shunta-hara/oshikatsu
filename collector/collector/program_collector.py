@@ -98,35 +98,35 @@ def run_program_collection(
     total_failed = 0
 
     for oshi in oshis:
-        logger.info("収集開始: '%s' (id=%d)", oshi.name, oshi.id)
+        logger.info("収集開始: '%s' (talent_id=%d)", oshi.name, oshi.talent_id)
 
         # 番組情報をフィードから収集
         try:
             entries = fetcher.fetch_for_oshi(oshi.name)
         except Exception as exc:
             logger.error(
-                "番組収集失敗: 推し='%s' (id=%d): %s",
+                "番組収集失敗: タレント='%s' (talent_id=%d): %s",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 exc,
             )
             total_failed += 1
             continue
 
-        logger.info("取得番組候補数: %d (推し: '%s')", len(entries), oshi.name)
+        logger.info("取得番組候補数: %d (タレント: '%s')", len(entries), oshi.name)
 
         # キーワードフィルタ・URL重複排除を適用
-        news_urls = (news_urls_by_oshi or {}).get(oshi.id, set())
+        news_urls = (news_urls_by_oshi or {}).get(oshi.talent_id, set())
         entries = _filter_program_entries(entries, news_urls)
         logger.info(
-            "フィルタ後番組数: %d (推し: '%s', ニュース重複除外URL: %d件)",
+            "フィルタ後番組数: %d (タレント: '%s', ニュース重複除外URL: %d件)",
             len(entries),
             oshi.name,
             len(news_urls),
         )
 
         if not entries:
-            logger.info("送信対象の番組情報なし: 推し='%s'", oshi.name)
+            logger.info("送信対象の番組情報なし: タレント='%s'", oshi.name)
             continue
 
         collected_at = datetime.now(timezone.utc)
@@ -144,22 +144,22 @@ def run_program_collection(
 
         # 一括 API で1回送信
         try:
-            result = client.post_program_batch(oshi_id=oshi.id, items=batch_items)
+            result = client.post_program_batch(talent_id=oshi.talent_id, items=batch_items)
             total_saved += result.saved_count
             total_skipped += result.skipped_count
             logger.info(
-                "収集完了: 推し='%s' (id=%d) - 受信: %d件, 新規保存: %d件, 重複スキップ: %d件",
+                "収集完了: タレント='%s' (talent_id=%d) - 受信: %d件, 新規保存: %d件, 重複スキップ: %d件",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 result.received_count,
                 result.saved_count,
                 result.skipped_count,
             )
         except Exception as exc:
             logger.error(
-                "一括送信失敗: 推し='%s' (id=%d): %s",
+                "一括送信失敗: タレント='%s' (talent_id=%d): %s",
                 oshi.name,
-                oshi.id,
+                oshi.talent_id,
                 exc,
             )
             total_failed += 1
