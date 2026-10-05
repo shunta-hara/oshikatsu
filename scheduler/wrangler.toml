@@ -8,7 +8,8 @@ preview_urls = false
 [triggers]
 # "17 */2 * * *"  ... 2時間ごとに GitHub workflow_dispatch でコレクターを起動
 # "0 0 * * 1"     ... 毎週月曜 0:00 UTC に backend の期限切れ記事削除エンドポイントを呼ぶ
-crons = ["17 */2 * * *", "0 0 * * 1"]
+# "47 */2 * * *"  ... 2時間ごと（コレクター起動の30分後）に Web Push 通知ジョブを呼ぶ
+crons = ["17 */2 * * *", "0 0 * * 1", "47 */2 * * *"]
 
 [vars]
 GITHUB_REPOSITORY = "shunta-hara/oshikatsu"
