@@ -17,8 +17,8 @@ from collector.program_fetcher import ProgramEntry, ProgramFetcher
 
 _NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
 
-_OSHI_A = OshiInfo(id=1, name="推しA")
-_OSHI_B = OshiInfo(id=2, name="推しB")
+_OSHI_A = OshiInfo(talent_id=1, name="推しA")
+_OSHI_B = OshiInfo(talent_id=2, name="推しB")
 
 # キーワードを含むエントリ（フィルタ通過）
 _ENTRY_PROGRAM = ProgramEntry(
@@ -158,14 +158,14 @@ class TestRunProgramCollection:
 
         client.post_program_batch.assert_called_once()
 
-    def test_run_collection_passes_correct_oshi_id_to_batch(self) -> None:
+    def test_run_collection_passes_correct_talent_id_to_batch(self) -> None:
         client = make_client()
         fetcher = make_fetcher(entries=[_ENTRY_PROGRAM])
 
         run_program_collection(client, fetcher, [_OSHI_A])
 
         call_kwargs = client.post_program_batch.call_args.kwargs
-        assert call_kwargs["oshi_id"] == 1
+        assert call_kwargs["talent_id"] == 1
 
     def test_run_collection_batch_items_contain_program_name_and_url(self) -> None:
         client = make_client()

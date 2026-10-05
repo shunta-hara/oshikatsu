@@ -12,8 +12,8 @@ from collector.news_fetcher import NewsEntry, NewsFetcher
 
 _NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
 
-_OSHI_A = OshiInfo(id=1, name="推しA")
-_OSHI_B = OshiInfo(id=2, name="推しB")
+_OSHI_A = OshiInfo(talent_id=1, name="推しA")
+_OSHI_B = OshiInfo(talent_id=2, name="推しB")
 
 _ENTRY_1 = NewsEntry(
     title="記事1",
@@ -70,14 +70,14 @@ class TestRunNewsCollection:
 
         client.post_news_batch.assert_called_once()
 
-    def test_run_collection_passes_correct_oshi_id_to_batch(self) -> None:
+    def test_run_collection_passes_correct_talent_id_to_batch(self) -> None:
         client = make_client()
         fetcher = make_fetcher(entries=[_ENTRY_1])
 
         run_news_collection(client, fetcher, [_OSHI_A])
 
         call_kwargs = client.post_news_batch.call_args.kwargs
-        assert call_kwargs["oshi_id"] == 1
+        assert call_kwargs["talent_id"] == 1
 
     def test_run_collection_batch_items_contain_titles_and_urls(self) -> None:
         client = make_client()

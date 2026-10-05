@@ -17,7 +17,7 @@ class CollectorConfig:
             os.environ.get("REQUEST_TIMEOUT_SECONDS", "30")
         )
         self.max_retries: int = int(os.environ.get("MAX_RETRIES", "3"))
-        self.oshi_id: int | None = self._parse_optional_int("OSHI_ID")
+        self.talent_id: int | None = self._parse_optional_int("TALENT_ID")
 
     @staticmethod
     def _require(key: str) -> str:

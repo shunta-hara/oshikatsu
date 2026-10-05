@@ -43,16 +43,39 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
 
         var oshi = new Oshi { UserId = user.Id, Name = "テスト推し", CreatedAt = dbNow, UpdatedAt = dbNow };
         _db.Oshis.Add(oshi);
+
+        // FEAT-039: Talent + UserOshi も作成して talent_id ベースのクエリが機能するようにする
+        var talent = new Talent
+        {
+            DisplayName = "テスト推し",
+            NormalizedName = TalentNameNormalizer.Normalize("テスト推し"),
+            CreatedAt = dbNow,
+        };
+        _db.Talents.Add(talent);
         await _db.SaveChangesAsync();
 
+        _db.UserOshis.Add(new UserOshi { UserId = user.Id, TalentId = talent.Id, CreatedAt = dbNow });
+        await _db.SaveChangesAsync();
+
+        // oshi に talentId を記録しておく（AddNewsItemAsync / AddProgramAsync で使うため）
+        oshi.Name = "テスト推し"; // 既設
         return (user, oshi);
+    }
+
+    // SetupUserAndOshiAsync で作成した talent_id を取得する
+    private async Task<int> GetTalentId()
+    {
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == TalentNameNormalizer.Normalize("テスト推し"));
+        return talent.Id;
     }
 
     private async Task AddNewsItemAsync(int oshiId, string sourceUrl, string title = "ニュース")
     {
+        var talentId = await GetTalentId();
         _db.NewsItems.Add(new NewsItem
         {
             OshiId = oshiId,
+            TalentId = talentId,
             Title = title,
             SourceUrl = sourceUrl,
             PublishedAt = _now,
@@ -65,10 +88,12 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
 
     private async Task AddProgramAsync(int oshiId, string sourceUrl, string? name = null)
     {
+        var talentId = await GetTalentId();
         // デフォルト名は sourceUrl を含めて一意にする（FEAT-035 の転載重複まとめが誤動作しないよう）
         _db.ProgramAppearances.Add(new ProgramAppearance
         {
             OshiId = oshiId,
+            TalentId = talentId,
             ProgramName = name ?? $"番組_{sourceUrl}",
             Broadcaster = "テストTV",
             AiredAt = _now,
@@ -136,26 +161,52 @@ public class FeedServiceProgramDeduplicationTests : IDisposable
     [Fact]
     public async Task GetProgramsAsync_ProgramUrlDuplicatesOtherOshisNews_NotExcluded()
     {
-        // 別の推し（他ユーザー）のニュースと URL が被っても除外されない
+        // 別のタレント（他ユーザーが追跡）のニュースと URL が被っても除外されない（FEAT-039 talent_id ベース）
         var dbNow = DateTime.UtcNow;
         var user1 = new User { Email = "u1@example.com", PasswordHash = "h", CreatedAt = dbNow, UpdatedAt = dbNow };
         var user2 = new User { Email = "u2@example.com", PasswordHash = "h", CreatedAt = dbNow, UpdatedAt = dbNow };
         _db.Users.AddRange(user1, user2);
         await _db.SaveChangesAsync();
 
-        var oshi1 = new Oshi { UserId = user1.Id, Name = "推し1", CreatedAt = dbNow, UpdatedAt = dbNow };
-        var oshi2 = new Oshi { UserId = user2.Id, Name = "推し2", CreatedAt = dbNow, UpdatedAt = dbNow };
-        _db.Oshis.AddRange(oshi1, oshi2);
+        // talent1 は user1 が、talent2 は user2 が登録
+        var talent1 = new Talent { DisplayName = "推し1", NormalizedName = TalentNameNormalizer.Normalize("推し1"), CreatedAt = dbNow };
+        var talent2 = new Talent { DisplayName = "推し2", NormalizedName = TalentNameNormalizer.Normalize("推し2"), CreatedAt = dbNow };
+        _db.Talents.AddRange(talent1, talent2);
+        await _db.SaveChangesAsync();
+
+        _db.UserOshis.AddRange(
+            new UserOshi { UserId = user1.Id, TalentId = talent1.Id, CreatedAt = dbNow },
+            new UserOshi { UserId = user2.Id, TalentId = talent2.Id, CreatedAt = dbNow });
         await _db.SaveChangesAsync();
 
         var crossUrl = "https://example.com/cross";
 
-        // oshi1 の番組に crossUrl
-        await AddProgramAsync(oshi1.Id, crossUrl);
-        // oshi2 のニュースに crossUrl
-        await AddNewsItemAsync(oshi2.Id, crossUrl);
+        // talent1 の番組に crossUrl
+        _db.ProgramAppearances.Add(new ProgramAppearance
+        {
+            TalentId = talent1.Id,
+            ProgramName = $"番組_{crossUrl}",
+            Broadcaster = "テストTV",
+            AiredAt = _now,
+            IsAiredAtEstimated = false,
+            SourceUrl = crossUrl,
+            CollectedAt = _now,
+            CreatedAt = _now,
+        });
+        // talent2 のニュースに crossUrl（talent1 とは別タレントなので除外対象外）
+        _db.NewsItems.Add(new NewsItem
+        {
+            TalentId = talent2.Id,
+            Title = "ニュース",
+            SourceUrl = crossUrl,
+            PublishedAt = _now,
+            IsPublishedAtEstimated = false,
+            CollectedAt = _now,
+            CreatedAt = _now,
+        });
+        await _db.SaveChangesAsync();
 
-        // user1 の番組一覧には oshi1 の番組が含まれる（oshi2 のニュースは別推しなので除外対象外）
+        // user1 の番組一覧には talent1 の番組が含まれる（talent2 のニュースは別タレントなので除外対象外）
         var result = await _sut.GetProgramsAsync(user1.Id, 1, 20);
 
         Assert.Equal(1, result.TotalCount);

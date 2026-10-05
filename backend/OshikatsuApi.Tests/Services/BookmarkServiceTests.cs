@@ -233,7 +233,7 @@ public class BookmarkServiceTests : IDisposable
         await _sut.AddBookmarkAsync(userId, news1.Id);
         await _sut.AddBookmarkAsync(userId, news2.Id);
 
-        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, oshiId: oshi1.Id);
+        var result = await _sut.GetBookmarksAsync(userId, page: 1, pageSize: 20, oshiId: await GetUserOshiId(oshi1));
 
         Assert.Equal(1, result.TotalCount);
         Assert.Equal("推しAニュース", result.Items[0].Title);
@@ -248,8 +248,8 @@ public class BookmarkServiceTests : IDisposable
         var news = await CreateNewsItemForOshi(oshi2, "他ユーザーニュース");
         await _sut.AddBookmarkAsync(userId2, news.Id);
 
-        // userId=1 が userId=2 の oshi2 で絞り込んでも空
-        var result = await _sut.GetBookmarksAsync(userId1, page: 1, pageSize: 20, oshiId: oshi2.Id);
+        // userId=1 が userId=2 の user_oshi_id で絞り込んでも空（user1 のリストにない）
+        var result = await _sut.GetBookmarksAsync(userId1, page: 1, pageSize: 20, oshiId: await GetUserOshiId(oshi2));
 
         Assert.Equal(0, result.TotalCount);
         Assert.Empty(result.Items);
@@ -443,7 +443,7 @@ public class BookmarkServiceTests : IDisposable
 
     /// <summary>
     /// テスト用にユーザーと2つの推しを同一ユーザー下に作成する。
-    /// FEAT-031 フィルタテストで推し別絞り込みの検証に使用する。
+    /// FEAT-039: Talent + UserOshi も同時に作成して talent_id ベースのフィルタが機能するようにする。
     /// </summary>
     private async Task<(int userId, Oshi oshi1, Oshi oshi2)> CreateTwoOshisForUser(int targetUserId)
     {
@@ -462,7 +462,48 @@ public class BookmarkServiceTests : IDisposable
         _db.Oshis.AddRange(oshi1, oshi2);
         await _db.SaveChangesAsync();
 
+        // Talent + UserOshi を作成
+        foreach (var oshi in new[] { oshi1, oshi2 })
+        {
+            var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+            var existingTalent = _db.Talents.Local.FirstOrDefault(t => t.NormalizedName == normalizedName)
+                ?? await _db.Talents.FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
+            if (existingTalent is null)
+            {
+                existingTalent = new Talent
+                {
+                    DisplayName = oshi.Name,
+                    NormalizedName = normalizedName,
+                    CreatedAt = DateTime.UtcNow,
+                };
+                _db.Talents.Add(existingTalent);
+                await _db.SaveChangesAsync();
+            }
+
+            var existingUserOshi = await _db.UserOshis
+                .FirstOrDefaultAsync(o => o.UserId == user.Id && o.TalentId == existingTalent.Id);
+            if (existingUserOshi is null)
+            {
+                _db.UserOshis.Add(new UserOshi
+                {
+                    UserId = user.Id,
+                    TalentId = existingTalent.Id,
+                    CreatedAt = DateTime.UtcNow,
+                });
+                await _db.SaveChangesAsync();
+            }
+        }
+
         return (user.Id, oshi1, oshi2);
+    }
+
+    // Oshi から user_oshis.id を取得するヘルパー（FEAT-039: oshiId フィルタは user_oshis.id）
+    private async Task<int> GetUserOshiId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        var userOshi = await _db.UserOshis.FirstAsync(o => o.UserId == oshi.UserId && o.TalentId == talent.Id);
+        return userOshi.Id;
     }
 
     private async Task<NewsItem> CreateNewsItemForOshi(
@@ -472,9 +513,13 @@ public class BookmarkServiceTests : IDisposable
         string? sourceName = null)
     {
         var now = DateTimeOffset.UtcNow;
+        // TalentId を取得して設定（FEAT-039: BookmarkService は TalentId でフィルタする）
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
         var item = new NewsItem
         {
             OshiId = oshi.Id,
+            TalentId = talent?.Id,
             Title = title,
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = now,

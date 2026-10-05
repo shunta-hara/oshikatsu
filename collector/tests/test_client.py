@@ -48,7 +48,7 @@ class TestPostNewsItem:
         client = BackendClient(make_config())
 
         result = client.post_news_item(
-            oshi_id=1,
+            talent_id=1,
             title="テストニュース",
             source_url="https://example.com/news/1",
             collected_at=_NOW,
@@ -63,7 +63,7 @@ class TestPostNewsItem:
         client = BackendClient(make_config(api_key="my-secret"))
 
         client.post_news_item(
-            oshi_id=1,
+            talent_id=1,
             title="title",
             source_url="https://example.com/1",
             collected_at=_NOW,
@@ -78,7 +78,7 @@ class TestPostNewsItem:
         published = datetime(2026, 7, 14, 10, 0, 0, tzinfo=timezone.utc)
 
         client.post_news_item(
-            oshi_id=1,
+            talent_id=1,
             title="title",
             source_url="https://example.com/1",
             collected_at=_NOW,
@@ -95,7 +95,7 @@ class TestPostNewsItem:
         client = BackendClient(make_config())
 
         client.post_news_item(
-            oshi_id=1,
+            talent_id=1,
             title="title",
             source_url="https://example.com/1",
             collected_at=_NOW,
@@ -118,7 +118,7 @@ class TestPostNewsItem:
         import unittest.mock as mock
         with mock.patch("collector.client.time.sleep"):
             result = client.post_news_item(
-                oshi_id=1,
+                talent_id=1,
                 title="title",
                 source_url="https://example.com/retry",
                 collected_at=_NOW,
@@ -138,7 +138,7 @@ class TestPostNewsItem:
         with mock.patch("collector.client.time.sleep"):
             with pytest.raises(RuntimeError, match="failed after 3 attempts"):
                 client.post_news_item(
-                    oshi_id=1,
+                    talent_id=1,
                     title="title",
                     source_url="https://example.com/fail",
                     collected_at=_NOW,
@@ -153,7 +153,7 @@ class TestPostNewsItem:
         import unittest.mock as mock
         with mock.patch("collector.client.time.sleep"):
             result = client.post_news_item(
-                oshi_id=1,
+                talent_id=1,
                 title="title",
                 source_url="https://example.com/429",
                 collected_at=_NOW,
@@ -171,7 +171,7 @@ class TestPostProgramAppearance:
         client = BackendClient(make_config())
 
         result = client.post_program_appearance(
-            oshi_id=1,
+            talent_id=1,
             program_name="テスト番組",
             source_url="https://tv.example.com/1",
             collected_at=_NOW,
@@ -187,7 +187,7 @@ class TestPostProgramAppearance:
         aired = datetime(2026, 7, 14, 20, 0, 0, tzinfo=timezone.utc)
 
         client.post_program_appearance(
-            oshi_id=1,
+            talent_id=1,
             program_name="番組",
             source_url="https://tv.example.com/2",
             collected_at=_NOW,
@@ -204,7 +204,7 @@ class TestPostProgramAppearance:
         client = BackendClient(make_config())
 
         client.post_program_appearance(
-            oshi_id=1,
+            talent_id=1,
             program_name="番組",
             source_url="https://tv.example.com/3",
             collected_at=_NOW,
@@ -222,7 +222,7 @@ class TestPostProgramAppearance:
         client = BackendClient(make_config())
 
         result = client.post_program_appearance(
-            oshi_id=1,
+            talent_id=1,
             program_name="番組",
             source_url="https://tv.example.com/dup",
             collected_at=_NOW,
@@ -241,7 +241,7 @@ class TestGetOshis:
         resp.add(
             resp.GET,
             self.OSHIS_URL,
-            json=[{"id": 1, "name": "推しA"}, {"id": 2, "name": "推しB"}],
+            json=[{"talentId": 1, "name": "推しA"}, {"talentId": 2, "name": "推しB"}],
             status=200,
         )
         client = BackendClient(make_config())
@@ -250,9 +250,9 @@ class TestGetOshis:
 
         assert len(result) == 2
         assert isinstance(result[0], OshiInfo)
-        assert result[0].id == 1
+        assert result[0].talent_id == 1
         assert result[0].name == "推しA"
-        assert result[1].id == 2
+        assert result[1].talent_id == 2
         assert result[1].name == "推しB"
 
     @resp.activate
@@ -278,7 +278,7 @@ class TestGetOshis:
     @resp.activate
     def test_get_oshis_retries_on_500(self) -> None:
         resp.add(resp.GET, self.OSHIS_URL, json={}, status=500)
-        resp.add(resp.GET, self.OSHIS_URL, json=[{"id": 1, "name": "推し"}], status=200)
+        resp.add(resp.GET, self.OSHIS_URL, json=[{"talentId": 1, "name": "推し"}], status=200)
         client = BackendClient(make_config(max_retries=3))
 
         import unittest.mock as mock
@@ -302,7 +302,7 @@ class TestGetOshis:
     @resp.activate
     def test_get_oshis_retries_on_429(self) -> None:
         resp.add(resp.GET, self.OSHIS_URL, json={}, status=429)
-        resp.add(resp.GET, self.OSHIS_URL, json=[{"id": 1, "name": "推し"}], status=200)
+        resp.add(resp.GET, self.OSHIS_URL, json=[{"talentId": 1, "name": "推し"}], status=200)
         client = BackendClient(make_config(max_retries=3))
 
         import unittest.mock as mock
@@ -319,9 +319,9 @@ class TestGetOshis:
             resp.GET,
             self.OSHIS_URL,
             json=[
-                {"id": 1, "name": "正常"},
-                {"id": "not-an-int", "name": "不正ID"},
-                {"id": 2},  # name がない
+                {"talentId": 1, "name": "正常"},
+                {"talentId": "not-an-int", "name": "不正ID"},
+                {"talentId": 2},  # name がない
                 "not-a-dict",
             ],
             status=200,
@@ -331,7 +331,7 @@ class TestGetOshis:
         result = client.get_oshis()
 
         assert len(result) == 1
-        assert result[0].id == 1
+        assert result[0].talent_id == 1
         assert result[0].name == "正常"
 
 
@@ -499,7 +499,7 @@ class TestPostNewsBatch:
             NewsBatchItem(title="記事2", source_url="https://example.com/2", collected_at=_NOW),
         ]
 
-        result = client.post_news_batch(oshi_id=1, items=items)
+        result = client.post_news_batch(talent_id=1, items=items)
 
         assert isinstance(result, BatchResult)
         assert result.received_count == 2
@@ -517,7 +517,7 @@ class TestPostNewsBatch:
         client = BackendClient(make_config(api_key="batch-key"))
         items = [NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)]
 
-        client.post_news_batch(oshi_id=1, items=items)
+        client.post_news_batch(talent_id=1, items=items)
 
         assert resp.calls[0].request.headers["X-Api-Key"] == "batch-key"
 
@@ -540,11 +540,12 @@ class TestPostNewsBatch:
             )
         ]
 
-        client.post_news_batch(oshi_id=5, items=items)
+        client.post_news_batch(talent_id=5, items=items)
 
         import json as _json
         body = _json.loads(resp.calls[0].request.body)
-        assert body["oshiId"] == 5
+        assert body["talentId"] == 5
+        assert "oshiId" not in body
         assert len(body["items"]) == 1
         assert body["items"][0]["title"] == "テスト記事"
         assert body["items"][0]["sourceUrl"] == "https://example.com/1"
@@ -565,7 +566,7 @@ class TestPostNewsBatch:
             NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)
         ]
 
-        client.post_news_batch(oshi_id=1, items=items)
+        client.post_news_batch(talent_id=1, items=items)
 
         import json as _json
         body = _json.loads(resp.calls[0].request.body)
@@ -589,7 +590,7 @@ class TestPostNewsBatch:
 
         import unittest.mock as mock
         with mock.patch("collector.client.time.sleep"):
-            result = client.post_news_batch(oshi_id=1, items=items)
+            result = client.post_news_batch(talent_id=1, items=items)
 
         assert result.saved_count == 1
         assert len(resp.calls) == 2
@@ -604,7 +605,7 @@ class TestPostNewsBatch:
         import unittest.mock as mock
         with mock.patch("collector.client.time.sleep"):
             with pytest.raises(RuntimeError, match="failed after 3 attempts"):
-                client.post_news_batch(oshi_id=1, items=items)
+                client.post_news_batch(talent_id=1, items=items)
 
 
 class TestPostProgramBatch:
@@ -629,7 +630,7 @@ class TestPostProgramBatch:
             )
         ]
 
-        result = client.post_program_batch(oshi_id=1, items=items)
+        result = client.post_program_batch(talent_id=1, items=items)
 
         assert isinstance(result, BatchResult)
         assert result.received_count == 1
@@ -655,11 +656,12 @@ class TestPostProgramBatch:
             )
         ]
 
-        client.post_program_batch(oshi_id=3, items=items)
+        client.post_program_batch(talent_id=3, items=items)
 
         import json as _json
         body = _json.loads(resp.calls[0].request.body)
-        assert body["oshiId"] == 3
+        assert body["talentId"] == 3
+        assert "oshiId" not in body
         assert len(body["items"]) == 1
         assert body["items"][0]["programName"] == "番組名"
         assert body["items"][0]["sourceUrl"] == "https://tv.example.com/1"
@@ -684,7 +686,7 @@ class TestPostProgramBatch:
             )
         ]
 
-        client.post_program_batch(oshi_id=1, items=items)
+        client.post_program_batch(talent_id=1, items=items)
 
         import json as _json
         body = _json.loads(resp.calls[0].request.body)
@@ -712,7 +714,7 @@ class TestPostProgramBatch:
 
         import unittest.mock as mock
         with mock.patch("collector.client.time.sleep"):
-            result = client.post_program_batch(oshi_id=1, items=items)
+            result = client.post_program_batch(talent_id=1, items=items)
 
         assert result.saved_count == 1
         assert len(resp.calls) == 2
@@ -733,7 +735,7 @@ class TestPostProgramBatch:
             ProgramBatchItem(program_name="番組B", source_url="https://tv.example.com/2", collected_at=_NOW),
         ]
 
-        result = client.post_program_batch(oshi_id=1, items=items)
+        result = client.post_program_batch(talent_id=1, items=items)
 
         assert result.received_count == 2
         assert result.saved_count == 1
@@ -788,7 +790,7 @@ class TestSourceNameInPayload:
             )
         ]
 
-        client.post_news_batch(oshi_id=1, items=items)
+        client.post_news_batch(talent_id=1, items=items)
 
         raw_body = resp.calls[0].request.body
         body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
@@ -816,7 +818,7 @@ class TestSourceNameInPayload:
             )
         ]
 
-        client.post_news_batch(oshi_id=1, items=items)
+        client.post_news_batch(talent_id=1, items=items)
 
         raw_body = resp.calls[0].request.body
         body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
@@ -841,7 +843,7 @@ class TestSourceNameInPayload:
             )
         ]
 
-        client.post_program_batch(oshi_id=1, items=items)
+        client.post_program_batch(talent_id=1, items=items)
 
         raw_body = resp.calls[0].request.body
         body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
@@ -869,8 +871,120 @@ class TestSourceNameInPayload:
             )
         ]
 
-        client.post_program_batch(oshi_id=1, items=items)
+        client.post_program_batch(talent_id=1, items=items)
 
         raw_body = resp.calls[0].request.body
         body = raw_body.decode("utf-8") if isinstance(raw_body, bytes) else raw_body
         assert "sourceName" not in body
+
+
+class TestFeat041TalentBasedApi:
+    """FEAT-041: タレントベース API への切り替えテスト"""
+
+    OSHIS_URL = "http://backend:8080/api/v1/internal/oshis"
+    NEWS_BATCH_URL = "http://backend:8080/api/v1/internal/news/batch"
+    PROGRAM_BATCH_URL = "http://backend:8080/api/v1/internal/programs/batch"
+
+    # ── get_oshis: talentId フィールドを正しく読む ───────────────────────────
+
+    @resp.activate
+    def test_get_oshis_parses_talent_id_field(self) -> None:
+        """API が talentId を返すとき OshiInfo.talent_id に格納される"""
+        resp.add(
+            resp.GET,
+            self.OSHIS_URL,
+            json=[{"talentId": 100, "name": "タレントA"}],
+            status=200,
+        )
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        assert len(result) == 1
+        assert result[0].talent_id == 100
+        assert result[0].name == "タレントA"
+
+    @resp.activate
+    def test_get_oshis_missing_talent_id_skips_item(self) -> None:
+        """talentId フィールドがないアイテムはスキップされる"""
+        resp.add(
+            resp.GET,
+            self.OSHIS_URL,
+            json=[
+                {"name": "IDなし"},       # talentId が欠けている
+                {"talentId": 1, "name": "正常"},
+            ],
+            status=200,
+        )
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        assert len(result) == 1
+        assert result[0].talent_id == 1
+
+    @resp.activate
+    def test_get_oshis_old_id_field_is_not_parsed(self) -> None:
+        """旧来の id フィールドは無視され、talentId がないアイテムはスキップされる"""
+        resp.add(
+            resp.GET,
+            self.OSHIS_URL,
+            json=[{"id": 99, "name": "旧フォーマット"}],
+            status=200,
+        )
+        client = BackendClient(make_config())
+
+        result = client.get_oshis()
+
+        # talentId がないのでスキップ
+        assert result == []
+
+    # ── post_news_batch: talentId を使う ────────────────────────────────────
+
+    @resp.activate
+    def test_post_news_batch_uses_talent_id_not_oshi_id(self) -> None:
+        """送信ペイロードのトップレベルキーが talentId であり oshiId でない"""
+        resp.add(
+            resp.POST,
+            self.NEWS_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [NewsBatchItem(title="T", source_url="https://example.com/1", collected_at=_NOW)]
+
+        client.post_news_batch(talent_id=7, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        assert "talentId" in body
+        assert body["talentId"] == 7
+        assert "oshiId" not in body
+
+    # ── post_program_batch: talentId を使う ─────────────────────────────────
+
+    @resp.activate
+    def test_post_program_batch_uses_talent_id_not_oshi_id(self) -> None:
+        """番組一括登録のペイロードが talentId を使う"""
+        resp.add(
+            resp.POST,
+            self.PROGRAM_BATCH_URL,
+            json={"receivedCount": 1, "savedCount": 1, "skippedCount": 0},
+            status=200,
+        )
+        client = BackendClient(make_config())
+        items = [
+            ProgramBatchItem(
+                program_name="番組",
+                source_url="https://tv.example.com/1",
+                collected_at=_NOW,
+            )
+        ]
+
+        client.post_program_batch(talent_id=8, items=items)
+
+        import json as _json
+        body = _json.loads(resp.calls[0].request.body)
+        assert "talentId" in body
+        assert body["talentId"] == 8
+        assert "oshiId" not in body

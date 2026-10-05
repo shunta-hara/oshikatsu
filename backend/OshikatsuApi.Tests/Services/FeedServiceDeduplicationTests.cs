@@ -32,8 +32,34 @@ public class FeedServiceDeduplicationTests : IDisposable
         var now = DateTime.UtcNow;
         var oshi = new Oshi { UserId = userId, Name = name, CreatedAt = now, UpdatedAt = now };
         _db.Oshis.Add(oshi);
+
+        // FEAT-039: Talent + UserOshi も作成して talent_id ベースのクエリが機能するようにする
+        var normalizedName = TalentNameNormalizer.Normalize(name);
+        var existingTalent = _db.Talents.Local.FirstOrDefault(t => t.NormalizedName == normalizedName)
+            ?? await _db.Talents.FirstOrDefaultAsync(t => t.NormalizedName == normalizedName);
+        if (existingTalent is null)
+        {
+            existingTalent = new Talent { DisplayName = name, NormalizedName = normalizedName, CreatedAt = now };
+            _db.Talents.Add(existingTalent);
+        }
         await _db.SaveChangesAsync();
+
+        var existingUserOshi = await _db.UserOshis.FirstOrDefaultAsync(o => o.UserId == userId && o.TalentId == existingTalent.Id);
+        if (existingUserOshi is null)
+        {
+            _db.UserOshis.Add(new UserOshi { UserId = userId, TalentId = existingTalent.Id, CreatedAt = now });
+            await _db.SaveChangesAsync();
+        }
+
         return oshi;
+    }
+
+    // Oshi から TalentId を取得するヘルパー
+    private async Task<int> GetTalentId(Oshi oshi)
+    {
+        var normalizedName = TalentNameNormalizer.Normalize(oshi.Name);
+        var talent = await _db.Talents.FirstAsync(t => t.NormalizedName == normalizedName);
+        return talent.Id;
     }
 
     private async Task<NewsItem> CreateNews(
@@ -44,9 +70,11 @@ public class FeedServiceDeduplicationTests : IDisposable
         string? sourceUrl = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new NewsItem
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             Title = title,
             SourceUrl = sourceUrl ?? $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = now,
@@ -67,9 +95,11 @@ public class FeedServiceDeduplicationTests : IDisposable
         string? sourceUrl = null)
     {
         var now = DateTimeOffset.UtcNow;
+        var talentId = await GetTalentId(oshi);
         var item = new ProgramAppearance
         {
             OshiId = oshi.Id,
+            TalentId = talentId,
             ProgramName = programName,
             SourceUrl = sourceUrl ?? $"https://example.com/prog/{Guid.NewGuid()}",
             CollectedAt = now,

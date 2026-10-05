@@ -26,14 +26,16 @@ public class OshisController : ControllerBase
     }
 
     /// <summary>推しを登録する</summary>
-    /// <response code="201">登録成功。登録した推し情報を返す</response>
+    /// <response code="201">登録成功。登録した推し情報（id=user_oshis.id, name=talent.display_name）を返す</response>
     /// <response code="400">バリデーションエラー（名前が空・100文字超など）</response>
     /// <response code="401">未認証</response>
+    /// <response code="409">同一ユーザーが既に同名タレントを登録済み</response>
     /// <response code="422">推し登録数の上限（20件）を超えている</response>
     [HttpPost]
     [ProducesResponseType(typeof(OshiResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Create([FromBody] CreateOshiRequestDto dto)
     {
@@ -43,8 +45,14 @@ public class OshisController : ControllerBase
             var result = await _oshiService.CreateAsync(userId, dto.Name);
             // Fire-and-forget: dispatch failures must not block or fail oshi registration.
             // TriggerCollectAsync catches all exceptions internally and logs them.
-            _ = _githubDispatchService.TriggerCollectAsync(result.Id);
+            // talent_id を dispatch inputs に渡す（FEAT-039: oshi_id → talent_id）
+            _ = _githubDispatchService.TriggerCollectAsync(result.TalentId);
             return StatusCode(StatusCodes.Status201Created, result);
+        }
+        catch (OshiDuplicateException)
+        {
+            return Conflict(
+                new MessageResponseDto { Message = "This talent is already registered as your oshi." });
         }
         catch (OshiLimitExceededException)
         {
@@ -54,7 +62,7 @@ public class OshisController : ControllerBase
     }
 
     /// <summary>ログインユーザーの推し一覧を取得する</summary>
-    /// <response code="200">推し一覧（登録日時昇順）</response>
+    /// <response code="200">推し一覧（登録日時昇順）。id=user_oshis.id, name=talent.display_name</response>
     /// <response code="401">未認証</response>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<OshiResponseDto>), StatusCodes.Status200OK)]
@@ -67,7 +75,7 @@ public class OshisController : ControllerBase
     }
 
     /// <summary>指定した推しを削除する</summary>
-    /// <response code="204">削除成功</response>
+    /// <response code="204">削除成功（UserOshi レコードのみ削除。Talent・記事・番組は残る）</response>
     /// <response code="401">未認証</response>
     /// <response code="403">他のユーザーの推しへのアクセス</response>
     /// <response code="404">推しが存在しない</response>

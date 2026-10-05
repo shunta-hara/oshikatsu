@@ -20,9 +20,14 @@ public class InternalCollectorService : IInternalCollectorService
     /// <inheritdoc />
     public async Task<InternalNewsResponseDto> CreateNewsItemAsync(CreateNewsItemRequestDto dto)
     {
-        // 同一ソースURLが既に存在する場合は無視（冪等）
+        // タレントの存在確認
+        var talentExists = await _db.Talents.AnyAsync(t => t.Id == dto.TalentId);
+        if (!talentExists)
+            throw new TalentNotFoundException();
+
+        // 同一ソースURLが同一タレントで既に存在する場合は無視（冪等）
         var existing = await _db.NewsItems
-            .FirstOrDefaultAsync(n => n.SourceUrl == dto.SourceUrl && n.OshiId == dto.OshiId);
+            .FirstOrDefaultAsync(n => n.SourceUrl == dto.SourceUrl && n.TalentId == dto.TalentId);
 
         if (existing is not null)
         {
@@ -39,13 +44,14 @@ public class InternalCollectorService : IInternalCollectorService
         var now = DateTimeOffset.UtcNow;
         var item = new NewsItem
         {
-            OshiId = dto.OshiId,
+            TalentId = dto.TalentId,
             Title = dto.Title,
             Summary = dto.Summary,
             SourceUrl = dto.SourceUrl,
             PublishedAt = publishedAt,
             IsPublishedAtEstimated = isEstimated,
             CollectedAt = collectedAt,
+            SourceName = string.IsNullOrWhiteSpace(dto.SourceName) ? null : dto.SourceName.Trim(),
             CreatedAt = now,
         };
 
@@ -58,18 +64,23 @@ public class InternalCollectorService : IInternalCollectorService
     /// <inheritdoc />
     public async Task<InternalProgramResponseDto> CreateProgramAppearanceAsync(CreateProgramAppearanceRequestDto dto)
     {
-        // 同一ソースURLが既に番組として存在する場合は無視（冪等）
+        // タレントの存在確認
+        var talentExists = await _db.Talents.AnyAsync(t => t.Id == dto.TalentId);
+        if (!talentExists)
+            throw new TalentNotFoundException();
+
+        // 同一ソースURLが同一タレントで既に番組として存在する場合は無視（冪等）
         var existing = await _db.ProgramAppearances
-            .FirstOrDefaultAsync(p => p.SourceUrl == dto.SourceUrl && p.OshiId == dto.OshiId);
+            .FirstOrDefaultAsync(p => p.SourceUrl == dto.SourceUrl && p.TalentId == dto.TalentId);
 
         if (existing is not null)
         {
             return ToProgramDto(existing, wasDuplicate: true);
         }
 
-        // FEAT-024: 同推しのニュースに同一 sourceUrl が存在する場合もスキップ
+        // FEAT-024: 同タレントのニュースに同一 sourceUrl が存在する場合もスキップ
         var existsInNews = await _db.NewsItems
-            .AnyAsync(n => n.SourceUrl == dto.SourceUrl && n.OshiId == dto.OshiId);
+            .AnyAsync(n => n.SourceUrl == dto.SourceUrl && n.TalentId == dto.TalentId);
 
         if (existsInNews)
         {
@@ -77,7 +88,7 @@ public class InternalCollectorService : IInternalCollectorService
             return new InternalProgramResponseDto
             {
                 Id = 0,
-                OshiId = dto.OshiId,
+                TalentId = dto.TalentId,
                 ProgramName = dto.ProgramName,
                 Broadcaster = dto.Broadcaster,
                 AiredAt = dto.AiredAt?.ToUniversalTime(),
@@ -90,8 +101,6 @@ public class InternalCollectorService : IInternalCollectorService
         }
 
         // 放送日時が未取得の場合は収集日時で代替し、推定フラグを立てる
-        // Npgsql は UTC 以外のオフセット付き DateTimeOffset を timestamptz に書き込めないため
-        // 受信した DateTimeOffset をすべて UTC に正規化してから保存する
         var isEstimated = dto.AiredAt is null;
         var airedAt = (dto.AiredAt ?? dto.CollectedAt).ToUniversalTime();
         var collectedAt = dto.CollectedAt.ToUniversalTime();
@@ -99,13 +108,14 @@ public class InternalCollectorService : IInternalCollectorService
         var now = DateTimeOffset.UtcNow;
         var item = new ProgramAppearance
         {
-            OshiId = dto.OshiId,
+            TalentId = dto.TalentId,
             ProgramName = dto.ProgramName,
             Broadcaster = dto.Broadcaster,
             AiredAt = airedAt,
             IsAiredAtEstimated = isEstimated,
             SourceUrl = dto.SourceUrl,
             CollectedAt = collectedAt,
+            SourceName = string.IsNullOrWhiteSpace(dto.SourceName) ? null : dto.SourceName.Trim(),
             CreatedAt = now,
         };
 
@@ -118,23 +128,25 @@ public class InternalCollectorService : IInternalCollectorService
     /// <inheritdoc />
     public async Task<IReadOnlyList<InternalOshiDto>> GetAllOshisAsync()
     {
-        return await _db.Oshis
-            .OrderBy(o => o.Id)
-            .Select(o => new InternalOshiDto { Id = o.Id, Name = o.Name })
+        // FEAT-040: 1人以上のユーザーが登録しているタレントのみ返す
+        return await _db.Talents
+            .Where(t => t.UserOshis.Any())
+            .OrderBy(t => t.Id)
+            .Select(t => new InternalOshiDto { TalentId = t.Id, Name = t.DisplayName })
             .ToListAsync();
     }
 
     /// <inheritdoc />
     public async Task<BatchResultResponseDto> BatchCreateNewsItemsAsync(BatchCreateNewsRequestDto dto)
     {
-        // 推しの存在確認
-        var oshiExists = await _db.Oshis.AnyAsync(o => o.Id == dto.OshiId);
-        if (!oshiExists)
-            throw new OshiNotFoundException();
+        // タレントの存在確認
+        var talentExists = await _db.Talents.AnyAsync(t => t.Id == dto.TalentId);
+        if (!talentExists)
+            throw new TalentNotFoundException();
 
-        // 当該推しに紐づく既存 sourceUrl を一括取得（DB の一括照合）
+        // 当該タレントに紐づく既存 sourceUrl を一括取得（DB の一括照合）
         var existingUrlsList = await _db.NewsItems
-            .Where(n => n.OshiId == dto.OshiId)
+            .Where(n => n.TalentId == dto.TalentId)
             .Select(n => n.SourceUrl)
             .ToListAsync();
         var existingUrls = new HashSet<string>(existingUrlsList, StringComparer.Ordinal);
@@ -166,7 +178,7 @@ public class InternalCollectorService : IInternalCollectorService
 
             newItems.Add(new NewsItem
             {
-                OshiId = dto.OshiId,
+                TalentId = dto.TalentId,
                 Title = item.Title,
                 Summary = item.Summary,
                 SourceUrl = item.SourceUrl,
@@ -204,21 +216,21 @@ public class InternalCollectorService : IInternalCollectorService
     /// <inheritdoc />
     public async Task<BatchResultResponseDto> BatchCreateProgramAppearancesAsync(BatchCreateProgramsRequestDto dto)
     {
-        // 推しの存在確認
-        var oshiExists = await _db.Oshis.AnyAsync(o => o.Id == dto.OshiId);
-        if (!oshiExists)
-            throw new OshiNotFoundException();
+        // タレントの存在確認
+        var talentExists = await _db.Talents.AnyAsync(t => t.Id == dto.TalentId);
+        if (!talentExists)
+            throw new TalentNotFoundException();
 
-        // 当該推しに紐づく既存の番組 sourceUrl を一括取得
+        // 当該タレントに紐づく既存の番組 sourceUrl を一括取得
         var existingProgramUrlsList = await _db.ProgramAppearances
-            .Where(p => p.OshiId == dto.OshiId)
+            .Where(p => p.TalentId == dto.TalentId)
             .Select(p => p.SourceUrl)
             .ToListAsync();
         var existingProgramUrls = new HashSet<string>(existingProgramUrlsList, StringComparer.Ordinal);
 
-        // FEAT-024: 同推しのニュースに既存の sourceUrl も除外対象
+        // FEAT-024: 同タレントのニュースに既存の sourceUrl も除外対象
         var existingNewsUrlsList = await _db.NewsItems
-            .Where(n => n.OshiId == dto.OshiId)
+            .Where(n => n.TalentId == dto.TalentId)
             .Select(n => n.SourceUrl)
             .ToListAsync();
         var existingNewsUrls = new HashSet<string>(existingNewsUrlsList, StringComparer.Ordinal);
@@ -252,7 +264,7 @@ public class InternalCollectorService : IInternalCollectorService
 
             newItems.Add(new ProgramAppearance
             {
-                OshiId = dto.OshiId,
+                TalentId = dto.TalentId,
                 ProgramName = item.ProgramName,
                 Broadcaster = item.Broadcaster,
                 AiredAt = airedAt,
@@ -297,7 +309,7 @@ public class InternalCollectorService : IInternalCollectorService
     private static InternalNewsResponseDto ToNewsDto(NewsItem item, bool wasDuplicate) => new()
     {
         Id = item.Id,
-        OshiId = item.OshiId,
+        TalentId = item.TalentId ?? 0,
         Title = item.Title,
         SourceUrl = item.SourceUrl,
         PublishedAt = item.PublishedAt,
@@ -310,7 +322,7 @@ public class InternalCollectorService : IInternalCollectorService
     private static InternalProgramResponseDto ToProgramDto(ProgramAppearance item, bool wasDuplicate) => new()
     {
         Id = item.Id,
-        OshiId = item.OshiId,
+        TalentId = item.TalentId ?? 0,
         ProgramName = item.ProgramName,
         Broadcaster = item.Broadcaster,
         AiredAt = item.AiredAt,

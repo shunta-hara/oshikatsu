@@ -93,8 +93,9 @@ public class GitHubDispatchServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task TriggerCollectAsync_WithToken_SendsOshiIdInBody()
+    public async Task TriggerCollectAsync_WithToken_SendsTalentIdInBody()
     {
+        // FEAT-039: oshi_id → talent_id に変更
         Environment.SetEnvironmentVariable("GITHUB_DISPATCH_TOKEN", "test-token");
         Environment.SetEnvironmentVariable("GITHUB_REPOSITORY", "owner/repo");
         SetupHttpClient(HttpStatusCode.NoContent);
@@ -104,7 +105,8 @@ public class GitHubDispatchServiceTests : IDisposable
 
         // FakeHandler がリクエスト送信時に本文を読み取って保存している
         Assert.Contains("99", _fakeHandler!.LastRequestBody);
-        Assert.Contains("oshi_id", _fakeHandler.LastRequestBody);
+        Assert.Contains("talent_id", _fakeHandler.LastRequestBody);
+        Assert.DoesNotContain("oshi_id", _fakeHandler.LastRequestBody);
     }
 
     [Fact]

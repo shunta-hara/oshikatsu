@@ -118,7 +118,7 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_published_at_estimated");
 
-                    b.Property<int>("OshiId")
+                    b.Property<int?>("OshiId")
                         .HasColumnType("integer")
                         .HasColumnName("oshi_id");
 
@@ -230,7 +230,7 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_aired_at_estimated");
 
-                    b.Property<int>("OshiId")
+                    b.Property<int?>("OshiId")
                         .HasColumnType("integer")
                         .HasColumnName("oshi_id");
 
@@ -434,8 +434,7 @@ namespace OshikatsuApi.Migrations
                     b.HasOne("OshikatsuApi.Entities.Oshi", "Oshi")
                         .WithMany("NewsItems")
                         .HasForeignKey("OshiId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
                         .WithMany("NewsItems")
@@ -463,8 +462,7 @@ namespace OshikatsuApi.Migrations
                     b.HasOne("OshikatsuApi.Entities.Oshi", "Oshi")
                         .WithMany("ProgramAppearances")
                         .HasForeignKey("OshiId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
                         .WithMany("ProgramAppearances")
