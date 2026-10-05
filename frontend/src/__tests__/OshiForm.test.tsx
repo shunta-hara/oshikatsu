@@ -86,6 +86,25 @@ describe("OshiForm", () => {
   });
 
   // --- 異常系 ---
+  it("409 エラー時に「同名の推しはすでに登録されています」が表示される", async () => {
+    const user = userEvent.setup();
+    mockCreateOshi.mockRejectedValueOnce(
+      new ApiError(409, "Conflict: already registered"),
+    );
+
+    renderForm();
+
+    await user.type(screen.getByLabelText("推しの名前"), "鈴木一郎");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("同名の推しはすでに登録されています"),
+      ).toBeInTheDocument();
+    });
+    expect(onOshiAdded).not.toHaveBeenCalled();
+  });
+
   it("422 エラー時に「推しの登録は最大20件までです」が表示される", async () => {
     const user = userEvent.setup();
     mockCreateOshi.mockRejectedValueOnce(
