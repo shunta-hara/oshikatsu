@@ -17,6 +17,7 @@ public static class StartupValidator
         ValidateConnectionString(configuration);
         ValidateJwtSecretKey(configuration);
         ValidateCollectorApiKey(configuration);
+        ValidateVapidSettings(configuration);
     }
 
     private static void ValidateConnectionString(IConfiguration configuration)
@@ -49,6 +50,25 @@ public static class StartupValidator
             throw new InvalidOperationException(
                 "必須設定 'CollectorSettings:ApiKey' が見つからないか空です。" +
                 " 環境変数 'CollectorSettings__ApiKey' を設定してください。");
+        }
+    }
+
+    private static void ValidateVapidSettings(IConfiguration configuration)
+    {
+        var publicKey = configuration["VapidSettings:PublicKey"];
+        if (string.IsNullOrWhiteSpace(publicKey))
+        {
+            throw new InvalidOperationException(
+                "必須設定 'VapidSettings:PublicKey' が見つからないか空です。" +
+                " 環境変数 'VapidSettings__PublicKey' を設定してください。");
+        }
+
+        var privateKey = configuration["VapidSettings:PrivateKey"];
+        if (string.IsNullOrWhiteSpace(privateKey))
+        {
+            throw new InvalidOperationException(
+                "必須設定 'VapidSettings:PrivateKey' が見つからないか空です。" +
+                " 環境変数 'VapidSettings__PrivateKey' を設定してください。");
         }
     }
 }

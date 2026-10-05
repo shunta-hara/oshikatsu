@@ -16,6 +16,7 @@ public class AppDbContext : DbContext
     public DbSet<RevokedToken> RevokedTokens => Set<RevokedToken>();
     public DbSet<CollectorJobLog> CollectorJobLogs => Set<CollectorJobLog>();
     public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -250,6 +251,37 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(e => e.NewsItemId)
                   .HasDatabaseName("ix_bookmarks_news_item_id");
+        });
+
+        // ─── PushSubscription ─────────────────────────────────────────────────
+        modelBuilder.Entity<PushSubscription>(entity =>
+        {
+            entity.ToTable("push_subscriptions");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Endpoint)
+                  .HasColumnName("endpoint")
+                  .IsRequired();
+            entity.Property(e => e.P256dh)
+                  .HasColumnName("p256dh")
+                  .IsRequired();
+            entity.Property(e => e.Auth)
+                  .HasColumnName("auth")
+                  .IsRequired();
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasOne(e => e.User)
+                  .WithMany()
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.Endpoint)
+                  .IsUnique()
+                  .HasDatabaseName("ix_push_subscriptions_endpoint");
+
+            entity.HasIndex(e => e.UserId)
+                  .HasDatabaseName("ix_push_subscriptions_user_id");
         });
 
         // ─── RevokedToken ─────────────────────────────────────────────────────

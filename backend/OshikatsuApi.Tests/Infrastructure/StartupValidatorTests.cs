@@ -11,13 +11,17 @@ public class StartupValidatorTests
     private static IConfiguration BuildConfig(
         string? connectionString = "Host=localhost;Database=oshikatsu",
         string? jwtSecretKey = "test-secret-key-32chars-at-minimum!",
-        string? collectorApiKey = "test-api-key")
+        string? collectorApiKey = "test-api-key",
+        string? vapidPublicKey = "test-vapid-public-key",
+        string? vapidPrivateKey = "test-vapid-private-key")
     {
         var settings = new Dictionary<string, string?>
         {
             ["ConnectionStrings:DefaultConnection"] = connectionString,
             ["JwtSettings:SecretKey"] = jwtSecretKey,
             ["CollectorSettings:ApiKey"] = collectorApiKey,
+            ["VapidSettings:PublicKey"] = vapidPublicKey,
+            ["VapidSettings:PrivateKey"] = vapidPrivateKey,
         };
         return new ConfigurationBuilder()
             .AddInMemoryCollection(settings)
@@ -130,5 +134,67 @@ public class StartupValidatorTests
         var ex = Assert.Throws<InvalidOperationException>(
             () => StartupValidator.ValidateRequiredConfiguration(config));
         Assert.Contains("CollectorSettings__ApiKey", ex.Message);
+    }
+
+    // ── 異常系: VAPID 公開鍵 ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ValidateRequiredConfiguration_MissingVapidPublicKey_Throws()
+    {
+        var config = BuildConfig(vapidPublicKey: null);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+        Assert.Contains("VapidSettings:PublicKey", ex.Message);
+    }
+
+    [Fact]
+    public void ValidateRequiredConfiguration_EmptyVapidPublicKey_Throws()
+    {
+        var config = BuildConfig(vapidPublicKey: "");
+
+        Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+    }
+
+    [Fact]
+    public void ValidateRequiredConfiguration_MissingVapidPublicKey_MessageContainsEnvVarHint()
+    {
+        var config = BuildConfig(vapidPublicKey: null);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+        Assert.Contains("VapidSettings__PublicKey", ex.Message);
+    }
+
+    // ── 異常系: VAPID 秘密鍵 ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ValidateRequiredConfiguration_MissingVapidPrivateKey_Throws()
+    {
+        var config = BuildConfig(vapidPrivateKey: null);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+        Assert.Contains("VapidSettings:PrivateKey", ex.Message);
+    }
+
+    [Fact]
+    public void ValidateRequiredConfiguration_WhitespaceVapidPrivateKey_Throws()
+    {
+        var config = BuildConfig(vapidPrivateKey: "   ");
+
+        Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+    }
+
+    [Fact]
+    public void ValidateRequiredConfiguration_MissingVapidPrivateKey_MessageContainsEnvVarHint()
+    {
+        var config = BuildConfig(vapidPrivateKey: null);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => StartupValidator.ValidateRequiredConfiguration(config));
+        Assert.Contains("VapidSettings__PrivateKey", ex.Message);
     }
 }

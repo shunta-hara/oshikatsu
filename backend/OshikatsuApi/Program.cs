@@ -37,6 +37,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.Configure<JwtSettings>(
     builder.Configuration.GetSection("JwtSettings"));
 
+// VAPID 設定のバインド（秘密鍵は環境変数 VapidSettings__PrivateKey で設定）
+builder.Services.Configure<VapidSettings>(
+    builder.Configuration.GetSection("VapidSettings"));
+
 // Swagger / OpenAPI（JWT Bearer 認証を定義に含める）
 builder.Services.AddSwaggerGen(options =>
 {
@@ -118,6 +122,9 @@ builder.Services.AddScoped<IBookmarkService, BookmarkService>();
 
 // 古い記事の自動削除サービス
 builder.Services.AddScoped<INewsCleanupService, NewsCleanupService>();
+
+// Web Push 購読管理サービス
+builder.Services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
 
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
