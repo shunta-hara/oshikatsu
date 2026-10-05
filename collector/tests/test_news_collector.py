@@ -454,5 +454,5 @@ class TestRunNewsCollectionExpiredFilter:
             mock_dt.now.return_value = _NOW
             result = run_news_collection(client, fetcher, [_OSHI_A])
 
-        assert "https://example.com/fresh" in result[_OSHI_A.id]
-        assert "https://example.com/old" not in result[_OSHI_A.id]
+        assert "https://example.com/fresh" in result[_OSHI_A.talent_id]
+        assert "https://example.com/old" not in result[_OSHI_A.talent_id]
