@@ -130,6 +130,9 @@ builder.Services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
 builder.Services.AddScoped<IWebPushClient, WebPushClientWrapper>();
 builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 
+// DB 使用量取得サービス（FEAT-053）
+builder.Services.AddScoped<IDbSizeService, DbSizeService>();
+
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 

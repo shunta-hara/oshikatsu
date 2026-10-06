@@ -157,6 +157,50 @@ public class PushNotificationService : IPushNotificationService
         };
     }
 
+    /// <inheritdoc />
+    public async Task<PushNotifyResult> BroadcastMessageAsync(string message, CancellationToken cancellationToken = default)
+    {
+        int successCount = 0;
+        int failureCount = 0;
+        int goneRemovedCount = 0;
+
+        var payload = JsonSerializer.Serialize(new
+        {
+            title = "oshikatsu システム通知",
+            body = message,
+        }, JsonOptions);
+
+        var allSubscriptions = await _db.PushSubscriptions.ToListAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "ブロードキャスト送信開始: {SubCount} 件の購読へ送信します。",
+            allSubscriptions.Count);
+
+        foreach (var sub in allSubscriptions)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var sendResult = await SendWithRetryAsync(sub.Endpoint, sub.P256dh, sub.Auth, payload, cancellationToken);
+            switch (sendResult)
+            {
+                case SendResult.Success:
+                    successCount++;
+                    break;
+                case SendResult.Gone:
+                    goneRemovedCount++;
+                    break;
+                case SendResult.Failure:
+                    failureCount++;
+                    break;
+            }
+        }
+
+        _logger.LogInformation(
+            "ブロードキャスト送信完了: 成功={Success}, 失敗={Failure}, Gone削除={Gone}",
+            successCount, failureCount, goneRemovedCount);
+
+        return new PushNotifyResult(successCount, failureCount, 0, goneRemovedCount);
+    }
+
     // ── プライベートヘルパー ─────────────────────────────────────────────────────
 
     private enum SendResult { Success, Failure, Gone }

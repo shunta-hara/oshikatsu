@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using OshikatsuApi.Authentication;
 using OshikatsuApi.DTOs;
 using OshikatsuApi.Services;
@@ -28,7 +29,8 @@ public class InternalPushController : ControllerBase
 
     /// <summary>全ユーザーへの Web Push 通知送信ジョブを実行する</summary>
     /// <remarks>
-    /// 直近の通知送信以降に収集された新着アイテムがあるユーザーへのみ通知を送信する。
+    /// リクエストボディに CustomMessage が設定されている場合は全購読者へブロードキャスト送信する（FEAT-053 DB容量警告等）。
+    /// CustomMessage が未設定の場合は直近通知送信以降に新着アイテムがあるユーザーへのみ通知を送信する。
     /// 410 Gone の endpoint は自動削除される。
     /// 送信失敗は最大 3 回リトライ（指数バックオフ）する。
     /// </remarks>
@@ -37,11 +39,22 @@ public class InternalPushController : ControllerBase
     [HttpPost("notify")]
     [ProducesResponseType(typeof(PushNotifyResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> Notify(CancellationToken cancellationToken)
+    public async Task<IActionResult> Notify(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] PushNotifyRequestDto? request,
+        CancellationToken cancellationToken)
     {
         _logger.LogInformation("Push 通知ジョブ開始");
 
-        var result = await _pushNotificationService.NotifyAllUsersAsync(cancellationToken);
+        PushNotifyResult result;
+        if (!string.IsNullOrWhiteSpace(request?.CustomMessage))
+        {
+            _logger.LogInformation("カスタムメッセージブロードキャスト: {Message}", request.CustomMessage);
+            result = await _pushNotificationService.BroadcastMessageAsync(request.CustomMessage, cancellationToken);
+        }
+        else
+        {
+            result = await _pushNotificationService.NotifyAllUsersAsync(cancellationToken);
+        }
 
         return Ok(new PushNotifyResponseDto
         {

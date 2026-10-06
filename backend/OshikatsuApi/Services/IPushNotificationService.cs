@@ -8,6 +8,14 @@ public interface IPushNotificationService
     /// </summary>
     /// <returns>送信成功・失敗・スキップ件数をまとめた結果</returns>
     Task<PushNotifyResult> NotifyAllUsersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 全購読者へカスタムメッセージをブロードキャスト送信する（DB容量警告等）。
+    /// </summary>
+    /// <param name="message">通知本文に使用するメッセージ</param>
+    /// <param name="cancellationToken">キャンセルトークン</param>
+    /// <returns>送信成功・失敗件数をまとめた結果（SkipCount は常に 0）</returns>
+    Task<PushNotifyResult> BroadcastMessageAsync(string message, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Push 通知ジョブの実行結果</summary>

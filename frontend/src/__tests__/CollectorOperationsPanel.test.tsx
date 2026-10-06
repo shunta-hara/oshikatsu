@@ -2,13 +2,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CollectorOperationsPanel } from "../components/collector/CollectorOperationsPanel";
 import * as collectorApi from "../api/collector";
+import * as healthApi from "../api/health";
 import { ApiError } from "../api/client";
 import type { CollectorOperationsResponse } from "../types/collector";
+import type { HealthResponse } from "../types/health";
 
 vi.mock("../api/collector");
+vi.mock("../api/health");
+
 const mockGetCollectorOperations = vi.mocked(
   collectorApi.getCollectorOperations,
 );
+const mockGetHealth = vi.mocked(healthApi.getHealth);
 
 function makeOperations(
   overrides: Partial<CollectorOperationsResponse> = {},
@@ -33,9 +38,21 @@ function makeJobLog(overrides: object = {}) {
   };
 }
 
+function makeHealth(overrides: Partial<HealthResponse> = {}): HealthResponse {
+  return {
+    status: "ok",
+    timestamp: "2026-10-06T00:00:00.000Z",
+    dbSizeBytes: 209_715_200,
+    dbSizeMb: 200.0,
+    ...overrides,
+  };
+}
+
 describe("CollectorOperationsPanel", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // デフォルト: DB 使用量あり（200 MB）
+    mockGetHealth.mockResolvedValue(makeHealth());
   });
 
   // ── 正常系 ─────────────────────────────────────────────────────────────
@@ -218,6 +235,85 @@ describe("CollectorOperationsPanel", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("推しC")).toBeInTheDocument();
       expect(screen.getByText("4回連続失敗中")).toBeInTheDocument();
+    });
+  });
+
+  // ── DB 使用量表示（FEAT-053）──────────────────────────────────────────────
+
+  it("DB 使用量セクションが表示される", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    mockGetHealth.mockResolvedValue(makeHealth({ dbSizeMb: 200.0 }));
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Neon DB 使用量")).toBeInTheDocument();
+    });
+  });
+
+  it("DB サイズが取得できたとき MB と % が表示される", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    // 200 MB / 500 MB = 40%
+    mockGetHealth.mockResolvedValue(makeHealth({ dbSizeMb: 200.0 }));
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/200 MB \/ 500 MB（40%）/)).toBeInTheDocument();
+    });
+  });
+
+  it("DB サイズが 400 MB 超のとき正しい % が表示される（閾値近辺）", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    // 450 MB / 500 MB = 90%
+    mockGetHealth.mockResolvedValue(makeHealth({ dbSizeMb: 450.0 }));
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/450 MB \/ 500 MB（90%）/)).toBeInTheDocument();
+    });
+  });
+
+  it("progressbar に DB 使用率が設定される", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    mockGetHealth.mockResolvedValue(makeHealth({ dbSizeMb: 250.0 })); // 50%
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      const progressBar = screen.getByRole("progressbar", {
+        name: "DB 使用率",
+      });
+      expect(progressBar).toHaveAttribute("aria-valuenow", "50");
+    });
+  });
+
+  it("DB サイズが null のとき「取得できませんでした」が表示される", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    mockGetHealth.mockResolvedValue(
+      makeHealth({ dbSizeMb: null, dbSizeBytes: null }),
+    );
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("DB 使用量を取得できませんでした"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("getHealth が失敗したとき「取得できませんでした」が表示される（サイレントエラー）", async () => {
+    mockGetCollectorOperations.mockResolvedValue(makeOperations());
+    mockGetHealth.mockRejectedValue(new Error("Network error"));
+
+    render(<CollectorOperationsPanel />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("DB 使用量を取得できませんでした"),
+      ).toBeInTheDocument();
     });
   });
 });
