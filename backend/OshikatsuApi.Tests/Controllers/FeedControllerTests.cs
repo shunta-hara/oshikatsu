@@ -389,6 +389,52 @@ public class FeedControllerTests
         Assert.IsType<OkObjectResult>(result);
     }
 
+    // ── GET /api/v1/news: sourceType フィルタ（FEAT-051）───────────────────────
+
+    [Fact]
+    public async Task GetNews_WithSourceType_PassesSourceTypeToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, null, null, null, "youtube")
+            .Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(sourceType: "youtube");
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, null, null, "youtube");
+    }
+
+    [Fact]
+    public async Task GetNews_WithSourceTypeNews_PassesNewsToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, null, null, null, "news")
+            .Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(sourceType: "news");
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, null, null, "news");
+    }
+
+    [Fact]
+    public async Task GetNews_WithNullSourceType_PassesNullToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, null, null, null, null, (string?)null)
+            .Returns(EmptyNewsPaged());
+
+        await _sut.GetNews();
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, null, null, null, null, (string?)null);
+    }
+
+    [Fact]
+    public async Task GetNews_WithSourceTypeAndOshiId_PassesBothToService()
+    {
+        _feedService.GetNewsAsync(1, 1, 20, 5, null, null, null, "event")
+            .Returns(EmptyNewsPaged());
+
+        await _sut.GetNews(oshiId: 5, sourceType: "event");
+
+        await _feedService.Received(1).GetNewsAsync(1, 1, 20, 5, null, null, null, "event");
+    }
+
     // ── GET /api/v1/programs: oshiId フィルタ ───────────────────────────────
 
     [Fact]

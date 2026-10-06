@@ -18,7 +18,8 @@ public class FeedService : IFeedService
     public async Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(
         int userId, int page, int pageSize,
         int? oshiId = null, string? query = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null)
+        DateTimeOffset? from = null, DateTimeOffset? to = null,
+        string? sourceType = null)
     {
         // FEAT-039: user_oshis テーブルからユーザーのタレント一覧を取得する
         var userOshisData = await _db.UserOshis
@@ -75,6 +76,22 @@ public class FeedService : IFeedService
         {
             var toUtc = to.Value.ToUniversalTime();
             newsQuery = newsQuery.Where(n => n.PublishedAt != null && n.PublishedAt <= toUtc);
+        }
+
+        // FEAT-051: ソースタイプフィルタ。
+        // "news" を指定した場合は SourceType が NULL のアイテム（通常ニュース記事）を返す。
+        // その他の値（"youtube", "x_post", "event" 等）はそのまま SourceType で絞り込む。
+        // null（未指定）の場合はフィルタなし（全タイプを返す）。
+        if (!string.IsNullOrEmpty(sourceType))
+        {
+            if (sourceType == "news")
+            {
+                newsQuery = newsQuery.Where(n => n.SourceType == null);
+            }
+            else
+            {
+                newsQuery = newsQuery.Where(n => n.SourceType == sourceType);
+            }
         }
 
         // FEAT-029: PublishedAt 降順、同一のとき ID 降順で並べる

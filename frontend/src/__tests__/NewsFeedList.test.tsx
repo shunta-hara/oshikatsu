@@ -321,6 +321,7 @@ describe("NewsFeedList", () => {
         "テスト",
         undefined,
         undefined,
+        undefined,
       );
     });
   });
@@ -395,10 +396,11 @@ describe("NewsFeedList", () => {
       expect(screen.getByText("全件表示のニュース")).toBeInTheDocument();
     });
 
-    // クリア後は query なしで呼ばれる（from/to も undefined）
+    // クリア後は query なしで呼ばれる（from/to/sourceType も undefined）
     expect(mockGetNews).toHaveBeenLastCalledWith(
       1,
       20,
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -447,6 +449,7 @@ describe("NewsFeedList", () => {
         undefined,
         "2026-08-01T00:00:00+09:00",
         "2026-08-31T23:59:59.999+09:00",
+        undefined,
       );
     });
   });
@@ -478,6 +481,7 @@ describe("NewsFeedList", () => {
       expect(mockGetNews).toHaveBeenLastCalledWith(
         1,
         20,
+        undefined,
         undefined,
         undefined,
         undefined,
@@ -669,5 +673,163 @@ describe("NewsFeedList", () => {
     expect(link).toHaveAttribute("href", "https://news.yahoo.co.jp/1");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  // ── ソースタイプフィルタ（FEAT-051） ─────────────────────────────────
+
+  it("ソースタイプフィルタが表示される", async () => {
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    expect(
+      screen.getByRole("group", { name: "ソースタイプで絞り込む" }),
+    ).toBeInTheDocument();
+  });
+
+  it("YouTubeチップをクリックするとsourceType付きでgetNewsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    // 初回ロード
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // sourceType=youtube でのロード
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    await user.click(screen.getByRole("radio", { name: /YouTube/ }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        "youtube",
+      );
+    });
+  });
+
+  it("「すべて」チップをクリックするとsourceTypeなしでgetNewsが呼ばれる", async () => {
+    const user = userEvent.setup();
+    mockGetNews.mockResolvedValue(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    // youtube を選んでから
+    await user.click(screen.getByRole("radio", { name: /YouTube/ }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledTimes(2);
+    });
+
+    // 「すべて」に戻す
+    await user.click(screen.getByRole("radio", { name: /すべて/ }));
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenLastCalledWith(
+        1,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+      );
+    });
+  });
+
+  it("sourceType='youtube' のアイテムに YouTube バッジが表示される", async () => {
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "YouTube動画タイトル",
+            summary: null,
+            sourceUrl: "https://www.youtube.com/watch?v=test",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceType: "youtube",
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("YouTube")).toBeInTheDocument();
+    });
+  });
+
+  it("sourceType=null のアイテムにバッジが表示されない", async () => {
+    mockGetNews.mockResolvedValue(
+      makeNewsPage({
+        items: [
+          {
+            id: 1,
+            oshiId: 1,
+            oshiName: "推しA",
+            title: "通常ニュース",
+            summary: null,
+            sourceUrl: "https://example.com/news/1",
+            publishedAt: null,
+            isPublishedAtEstimated: false,
+            collectedAt: "2026-07-16T10:00:00+09:00",
+            sourceType: null,
+          },
+        ],
+        totalCount: 1,
+        totalPages: 1,
+      }),
+    );
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(screen.getByText("通常ニュース")).toBeInTheDocument();
+    });
+
+    // sourceType バッジが存在しない
+    expect(
+      document.querySelector(".feed-card__source-type-badge"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ソースタイプフィルタ選択後 0件のとき「該当するニュースが見つかりません」が表示される", async () => {
+    const user = userEvent.setup();
+    // 初回ロード（全件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+    // sourceType フィルタ後（0件）
+    mockGetNews.mockResolvedValueOnce(makeNewsPage());
+
+    render(<NewsFeedList />);
+
+    await waitFor(() => {
+      expect(mockGetNews).toHaveBeenCalledOnce();
+    });
+
+    await user.click(screen.getByRole("radio", { name: /イベント/ }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("該当するニュースが見つかりません"),
+      ).toBeInTheDocument();
+    });
   });
 });

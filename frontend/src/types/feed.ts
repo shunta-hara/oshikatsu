@@ -26,6 +26,12 @@ export const newsItemSchema = z.object({
   otherSourceCount: z.number().int().optional(),
   /** まとめた他媒体のリンク一覧（FEAT-035） */
   otherSources: z.array(otherSourceSchema).optional(),
+  /**
+   * ソースタイプ（FEAT-051）。通常のニュース記事は null。
+   * "youtube" | "x_post" | "event" 等。
+   * NULL の場合は「ニュース」として扱う。
+   */
+  sourceType: z.string().nullable().optional(),
 });
 
 export type NewsItem = z.infer<typeof newsItemSchema>;

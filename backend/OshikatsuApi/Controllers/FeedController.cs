@@ -30,6 +30,11 @@ public class FeedController : ControllerBase
     /// <param name="q">キーワード検索文字列。タイトルまたは本文要約に対して部分一致で絞り込む（省略時は全件）</param>
     /// <param name="from">絞り込み開始日時（ISO 8601、例: 2026-08-01T00:00:00Z）。PublishedAt がこれ以降のニュースを返す。省略可</param>
     /// <param name="to">絞り込み終了日時（ISO 8601、例: 2026-08-31T23:59:59Z）。PublishedAt がこれ以前のニュースを返す。省略可</param>
+    /// <param name="sourceType">
+    /// ソースタイプ絞り込み（FEAT-051）。省略時は全タイプを返す。
+    /// "news" = 通常ニュース記事（SourceType が NULL のアイテム）、
+    /// "youtube" = YouTube 動画、"x_post" = X 投稿、"event" = イベント/ライブ告知。
+    /// </param>
     /// <response code="200">ページネーション付きニュース一覧</response>
     /// <response code="400">終了日時が開始日時より前（to &lt; from）</response>
     /// <response code="401">未認証</response>
@@ -43,7 +48,8 @@ public class FeedController : ControllerBase
         [FromQuery] int? oshiId = null,
         [FromQuery] string? q = null,
         [FromQuery] DateTimeOffset? from = null,
-        [FromQuery] DateTimeOffset? to = null)
+        [FromQuery] DateTimeOffset? to = null,
+        [FromQuery] string? sourceType = null)
     {
         if (from.HasValue && to.HasValue && to.Value < from.Value)
         {
@@ -54,7 +60,7 @@ public class FeedController : ControllerBase
         if (pageSize < 1 || pageSize > MaxPageSize) pageSize = DefaultPageSize;
 
         var userId = GetCurrentUserId();
-        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId, q, from, to);
+        var result = await _feedService.GetNewsAsync(userId, page, pageSize, oshiId, q, from, to, sourceType);
         return Ok(result);
     }
 

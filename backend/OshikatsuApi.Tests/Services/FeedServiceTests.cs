@@ -938,7 +938,8 @@ public class FeedServiceTests : IDisposable
         string title,
         string? summary = null,
         DateTimeOffset? collectedAt = null,
-        DateTimeOffset? publishedAt = null)
+        DateTimeOffset? publishedAt = null,
+        string? sourceType = null)
     {
         var now = DateTimeOffset.UtcNow;
         var talentId = await GetTalentId(oshi);
@@ -951,6 +952,7 @@ public class FeedServiceTests : IDisposable
             SourceUrl = $"https://example.com/news/{Guid.NewGuid()}",
             CollectedAt = collectedAt ?? now,
             PublishedAt = publishedAt,
+            SourceType = sourceType,
             CreatedAt = now,
         };
         _db.NewsItems.Add(item);
@@ -1117,5 +1119,131 @@ public class FeedServiceTests : IDisposable
 
         Assert.Single(result.Items);
         Assert.Contains("nhk_morning_news", result.Items[0].Title);
+    }
+
+    // ── GetNewsAsync: ソースタイプフィルタ（FEAT-051）────────────────────────
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeNews_ReturnsOnlyNullSourceTypeItems()
+    {
+        // sourceType="news" → SourceType が NULL のアイテムのみ返す
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+        await CreateNewsItem(oshi, "YouTube動画", sourceType: "youtube");
+        await CreateNewsItem(oshi, "X投稿", sourceType: "x_post");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: "news");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("通常ニュース", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeYoutube_ReturnsOnlyYoutubeItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+        await CreateNewsItem(oshi, "YouTube動画A", sourceType: "youtube");
+        await CreateNewsItem(oshi, "YouTube動画B", sourceType: "youtube");
+        await CreateNewsItem(oshi, "X投稿", sourceType: "x_post");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: "youtube");
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.All(result.Items, item => Assert.Equal("youtube", item.SourceType));
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeXPost_ReturnsOnlyXPostItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+        await CreateNewsItem(oshi, "X投稿", sourceType: "x_post");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: "x_post");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("X投稿", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeEvent_ReturnsOnlyEventItems()
+    {
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+        await CreateNewsItem(oshi, "イベント告知", sourceType: "event");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: "event");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("イベント告知", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithNullSourceType_ReturnsAllItems()
+    {
+        // sourceType=null（未指定）→ 全タイプを返す
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+        await CreateNewsItem(oshi, "YouTube動画", sourceType: "youtube");
+        await CreateNewsItem(oshi, "X投稿", sourceType: "x_post");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: null);
+
+        Assert.Equal(3, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeNoMatch_ReturnsEmpty()
+    {
+        // 存在しない sourceType を指定 → 空を返す
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, sourceType: "nonexistent");
+
+        Assert.Equal(0, result.TotalCount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_WithSourceTypeAndKeyword_FiltersBothCriteria()
+    {
+        // sourceType + キーワードの複合フィルタ
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "YouTube コンサート動画", sourceType: "youtube");
+        await CreateNewsItem(oshi, "YouTube 日常動画", sourceType: "youtube");
+        await CreateNewsItem(oshi, "ニュース コンサート報道", sourceType: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20, query: "コンサート", sourceType: "youtube");
+
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal("YouTube コンサート動画", result.Items[0].Title);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_SourceTypeResponseDto_ContainsSourceType()
+    {
+        // DTO の SourceType フィールドに SourceType が正しく入っている
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "YouTube動画", sourceType: "youtube");
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        Assert.Single(result.Items);
+        Assert.Equal("youtube", result.Items[0].SourceType);
+    }
+
+    [Fact]
+    public async Task GetNewsAsync_NullSourceTypeItem_SourceTypeInResponseIsNull()
+    {
+        // SourceType が NULL のアイテムは DTO でも null として返す
+        var oshi = await CreateOshi(userId: 1, name: "推しA");
+        await CreateNewsItem(oshi, "通常ニュース", sourceType: null);
+
+        var result = await _sut.GetNewsAsync(userId: 1, page: 1, pageSize: 20);
+
+        Assert.Single(result.Items);
+        Assert.Null(result.Items[0].SourceType);
     }
 }

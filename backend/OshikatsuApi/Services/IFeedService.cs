@@ -10,11 +10,14 @@ public interface IFeedService
     /// oshiId が指定された場合はその推しのニュースのみ返す。指定した oshiId がユーザーの推しでない場合は空を返す。
     /// query が指定された場合はタイトルまたは本文要約に対して部分一致で絞り込む。
     /// from / to が指定された場合は PublishedAt による日付範囲フィルタを適用する（PublishedAt が null のアイテムは除外）。
+    /// sourceType が指定された場合は SourceType による絞り込みを適用する。
+    /// "news" を指定すると SourceType が NULL のアイテム（通常ニュース記事）のみを返す。
     /// </summary>
     Task<PaginatedResponseDto<NewsItemResponseDto>> GetNewsAsync(
         int userId, int page, int pageSize,
         int? oshiId = null, string? query = null,
-        DateTimeOffset? from = null, DateTimeOffset? to = null);
+        DateTimeOffset? from = null, DateTimeOffset? to = null,
+        string? sourceType = null);
 
     /// <summary>
     /// ユーザーの推し全員分（または特定の推し）の出演番組を収集日時の新しい順でページネーション取得する。

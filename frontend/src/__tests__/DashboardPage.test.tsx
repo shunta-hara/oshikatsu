@@ -256,6 +256,7 @@ describe("DashboardPage", () => {
         undefined,
         undefined,
         undefined,
+        undefined,
       );
     });
   });

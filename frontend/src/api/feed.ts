@@ -15,6 +15,7 @@ export async function getNews(
   query?: string,
   from?: string,
   to?: string,
+  sourceType?: string,
 ): Promise<NewsPaginatedResponse> {
   let url = `/news?page=${page}&pageSize=${pageSize}`;
   if (oshiId !== undefined) {
@@ -28,6 +29,9 @@ export async function getNews(
   }
   if (to !== undefined) {
     url += `&to=${encodeURIComponent(to)}`;
+  }
+  if (sourceType !== undefined) {
+    url += `&sourceType=${encodeURIComponent(sourceType)}`;
   }
   const raw = await apiFetch<unknown>(url);
   return newsPaginatedSchema.parse(raw);
