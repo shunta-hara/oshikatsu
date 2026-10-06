@@ -14,4 +14,7 @@ public class InternalNewsResponseDto
 
     /// <summary>true = 既に登録済みのため無視（冪等）</summary>
     public bool WasDuplicate { get; set; }
+
+    /// <summary>ソースタイプ（"youtube" 等）。通常のニュースは null。</summary>
+    public string? SourceType { get; set; }
 }

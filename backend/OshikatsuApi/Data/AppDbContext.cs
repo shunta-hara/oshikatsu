@@ -17,6 +17,7 @@ public class AppDbContext : DbContext
     public DbSet<CollectorJobLog> CollectorJobLogs => Set<CollectorJobLog>();
     public DbSet<Bookmark> Bookmarks => Set<Bookmark>();
     public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
+    public DbSet<TalentSource> TalentSources => Set<TalentSource>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -136,6 +137,9 @@ public class AppDbContext : DbContext
             entity.Property(e => e.SourceName)
                   .HasColumnName("source_name")
                   .HasMaxLength(200);
+            entity.Property(e => e.SourceType)
+                  .HasColumnName("source_type")
+                  .HasMaxLength(50);
             entity.Property(e => e.TalentId).HasColumnName("talent_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
 
@@ -295,6 +299,37 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(e => e.UserId)
                   .HasDatabaseName("ix_push_subscriptions_user_id");
+        });
+
+        // ─── TalentSource ─────────────────────────────────────────────────────
+        modelBuilder.Entity<TalentSource>(entity =>
+        {
+            entity.ToTable("talent_sources");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.TalentId).HasColumnName("talent_id");
+            entity.Property(e => e.SourceType)
+                  .HasColumnName("source_type")
+                  .HasMaxLength(50)
+                  .IsRequired();
+            entity.Property(e => e.SourceId)
+                  .HasColumnName("source_id")
+                  .HasMaxLength(500)
+                  .IsRequired();
+            entity.Property(e => e.IsEnabled).HasColumnName("is_enabled");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasOne(e => e.Talent)
+                  .WithMany()
+                  .HasForeignKey(e => e.TalentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.TalentId, e.SourceType, e.SourceId })
+                  .IsUnique()
+                  .HasDatabaseName("ix_talent_sources_talent_id_source_type_source_id");
+
+            entity.HasIndex(e => e.TalentId)
+                  .HasDatabaseName("ix_talent_sources_talent_id");
         });
 
         // ─── RevokedToken ─────────────────────────────────────────────────────

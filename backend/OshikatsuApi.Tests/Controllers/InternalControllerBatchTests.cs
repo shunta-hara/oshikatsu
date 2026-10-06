@@ -15,6 +15,7 @@ public class InternalControllerBatchTests
     private readonly IInternalCollectorService _service;
     private readonly ICollectorJobLogService _jobLogService;
     private readonly INewsCleanupService _cleanupService;
+    private readonly ITalentSourceService _talentSourceService;
     private readonly InternalController _sut;
     private readonly DateTimeOffset _now = DateTimeOffset.UtcNow;
 
@@ -23,7 +24,8 @@ public class InternalControllerBatchTests
         _service = Substitute.For<IInternalCollectorService>();
         _jobLogService = Substitute.For<ICollectorJobLogService>();
         _cleanupService = Substitute.For<INewsCleanupService>();
-        _sut = new InternalController(_service, _jobLogService, _cleanupService);
+        _talentSourceService = Substitute.For<ITalentSourceService>();
+        _sut = new InternalController(_service, _jobLogService, _cleanupService, _talentSourceService);
     }
 
     // ── POST /api/v1/internal/news/batch: 正常系 ────────────────────────────

@@ -36,4 +36,8 @@ public class CreateNewsItemRequestDto
     /// <summary>媒体名（任意）</summary>
     [MaxLength(200)]
     public string? SourceName { get; set; }
+
+    /// <summary>ソースタイプ（任意）。"youtube" 等。未設定は通常のニュース記事扱い。</summary>
+    [MaxLength(50)]
+    public string? SourceType { get; set; }
 }

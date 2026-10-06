@@ -32,4 +32,8 @@ public class BatchNewsItemDto
     /// <summary>媒体名（FEAT-036）。RSS の source 要素またはタイトル末尾から抽出。取得できない場合は null。</summary>
     [MaxLength(200)]
     public string? SourceName { get; set; }
+
+    /// <summary>ソースタイプ（任意）。"youtube" 等。未設定は通常のニュース記事扱い。</summary>
+    [MaxLength(50)]
+    public string? SourceType { get; set; }
 }

@@ -18,15 +18,18 @@ public class InternalController : ControllerBase
     private readonly IInternalCollectorService _collectorService;
     private readonly ICollectorJobLogService _jobLogService;
     private readonly INewsCleanupService _cleanupService;
+    private readonly ITalentSourceService _talentSourceService;
 
     public InternalController(
         IInternalCollectorService collectorService,
         ICollectorJobLogService jobLogService,
-        INewsCleanupService cleanupService)
+        INewsCleanupService cleanupService,
+        ITalentSourceService talentSourceService)
     {
         _collectorService = collectorService;
         _jobLogService = jobLogService;
         _cleanupService = cleanupService;
+        _talentSourceService = talentSourceService;
     }
 
     /// <summary>ニュースアイテムを登録する（重複ソースURLは無視）</summary>
@@ -188,5 +191,65 @@ public class InternalController : ControllerBase
     {
         var deletedCount = await _cleanupService.DeleteExpiredNewsAsync();
         return Ok(new DeleteExpiredNewsResponseDto { DeletedCount = deletedCount });
+    }
+
+    // ── talent-sources エンドポイント（FEAT-048）────────────────────────────
+
+    /// <summary>タレントのソース一覧を取得する</summary>
+    /// <param name="talentId">絞り込み対象タレントID（省略時は全件）</param>
+    /// <response code="200">ソース一覧</response>
+    /// <response code="401">API キーなし・不正</response>
+    [HttpGet("talent-sources")]
+    [ProducesResponseType(typeof(IReadOnlyList<TalentSourceResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetTalentSources([FromQuery] int? talentId = null)
+    {
+        var result = await _talentSourceService.GetSourcesAsync(talentId);
+        return Ok(result);
+    }
+
+    /// <summary>タレントにソースを登録する</summary>
+    /// <response code="201">登録成功</response>
+    /// <response code="400">バリデーションエラー</response>
+    /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した talentId が存在しない</response>
+    /// <response code="409">同一ソースが既に登録済み</response>
+    [HttpPost("talent-sources")]
+    [ProducesResponseType(typeof(TalentSourceResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateTalentSource([FromBody] CreateTalentSourceRequestDto dto)
+    {
+        try
+        {
+            var result = await _talentSourceService.CreateSourceAsync(dto);
+            return Created(string.Empty, result);
+        }
+        catch (TalentNotFoundException)
+        {
+            return NotFound(new MessageResponseDto { Message = "指定した talentId が見つかりません。" });
+        }
+        catch (DuplicateTalentSourceException)
+        {
+            return Conflict(new MessageResponseDto { Message = "同一のソースが既に登録済みです。" });
+        }
+    }
+
+    /// <summary>タレントのソースを削除する</summary>
+    /// <response code="204">削除成功</response>
+    /// <response code="401">API キーなし・不正</response>
+    /// <response code="404">指定した id が存在しない</response>
+    [HttpDelete("talent-sources/{id:int}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteTalentSource(int id)
+    {
+        var deleted = await _talentSourceService.DeleteSourceAsync(id);
+        if (!deleted)
+            return NotFound(new MessageResponseDto { Message = "指定したソースが見つかりません。" });
+        return NoContent();
     }
 }

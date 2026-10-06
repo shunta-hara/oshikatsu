@@ -18,6 +18,8 @@ class CollectorConfig:
         )
         self.max_retries: int = int(os.environ.get("MAX_RETRIES", "3"))
         self.talent_id: int | None = self._parse_optional_int("TALENT_ID")
+        # YouTube Data API v3 キー（未設定時は YouTube 収集をスキップ）
+        self.youtube_api_key: str | None = self._parse_optional_str("YOUTUBE_API_KEY")
 
     @staticmethod
     def _require(key: str) -> str:
@@ -28,6 +30,15 @@ class CollectorConfig:
                 f"Required environment variable '{key}' is not set or empty."
             )
         return value
+
+    @staticmethod
+    def _parse_optional_str(key: str) -> str | None:
+        """
+        オプションの文字列環境変数を取得する。
+        未設定・空文字は None を返す。
+        """
+        value = os.environ.get(key, "").strip()
+        return value if value else None
 
     @staticmethod
     def _parse_optional_int(key: str) -> int | None:

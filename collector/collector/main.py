@@ -14,6 +14,7 @@ from collector.news_collector import run_news_collection
 from collector.news_fetcher import NewsFetcher
 from collector.program_collector import run_program_collection
 from collector.program_fetcher import ProgramFetcher
+from collector.youtube_collector import YouTubeFetcher, run_youtube_collection
 
 
 def main() -> None:
@@ -78,6 +79,32 @@ def main() -> None:
         target_oshis,
         news_urls_by_oshi=news_urls_by_oshi,
     )
+
+    # YouTube 収集（API キーが設定されている場合のみ）
+    if config.youtube_api_key:
+        try:
+            talent_sources = client.get_talent_sources(source_type="youtube")
+        except Exception as exc:
+            logger.error("YouTube ソース一覧の取得に失敗しました: %s", exc)
+            talent_sources = []
+
+        if talent_sources:
+            # TALENT_ID が指定された場合は対象タレントのソースのみに絞る
+            if config.talent_id is not None:
+                talent_sources = [s for s in talent_sources if s.talent_id == config.talent_id]
+
+            youtube_fetcher = YouTubeFetcher(
+                api_key=config.youtube_api_key,
+                timeout=config.request_timeout_seconds,
+                max_retries=config.max_retries,
+            )
+            run_youtube_collection(client, youtube_fetcher, talent_sources)
+        else:
+            logger.info("YouTube ソースが 0 件です。YouTube 収集をスキップします。")
+    else:
+        logger.info(
+            "YOUTUBE_API_KEY が未設定です。YouTube 収集をスキップします。"
+        )
 
     logger.info("Collector finished")
 

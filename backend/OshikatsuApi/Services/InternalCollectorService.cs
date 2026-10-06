@@ -52,6 +52,7 @@ public class InternalCollectorService : IInternalCollectorService
             IsPublishedAtEstimated = isEstimated,
             CollectedAt = collectedAt,
             SourceName = string.IsNullOrWhiteSpace(dto.SourceName) ? null : dto.SourceName.Trim(),
+            SourceType = string.IsNullOrWhiteSpace(dto.SourceType) ? null : dto.SourceType.Trim(),
             CreatedAt = now,
         };
 
@@ -186,6 +187,7 @@ public class InternalCollectorService : IInternalCollectorService
                 IsPublishedAtEstimated = isEstimated,
                 CollectedAt = collectedAt,
                 SourceName = string.IsNullOrWhiteSpace(item.SourceName) ? null : item.SourceName.Trim(),
+                SourceType = string.IsNullOrWhiteSpace(item.SourceType) ? null : item.SourceType.Trim(),
                 CreatedAt = now,
             });
         }
@@ -317,6 +319,7 @@ public class InternalCollectorService : IInternalCollectorService
         CollectedAt = item.CollectedAt,
         CreatedAt = item.CreatedAt,
         WasDuplicate = wasDuplicate,
+        SourceType = item.SourceType,
     };
 
     private static InternalProgramResponseDto ToProgramDto(ProgramAppearance item, bool wasDuplicate) => new()

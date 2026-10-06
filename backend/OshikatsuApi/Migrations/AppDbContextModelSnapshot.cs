@@ -146,6 +146,11 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("source_name");
 
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source_type");
+
                     b.Property<string>("SourceUrl")
                         .IsRequired()
                         .HasColumnType("text")
@@ -396,6 +401,51 @@ namespace OshikatsuApi.Migrations
                     b.ToTable("talents", (string)null);
                 });
 
+            modelBuilder.Entity("OshikatsuApi.Entities.TalentSource", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_enabled");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("source_id");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source_type");
+
+                    b.Property<int>("TalentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("talent_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TalentId")
+                        .HasDatabaseName("ix_talent_sources_talent_id");
+
+                    b.HasIndex("TalentId", "SourceType", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_talent_sources_talent_id_source_type_source_id");
+
+                    b.ToTable("talent_sources", (string)null);
+                });
+
             modelBuilder.Entity("OshikatsuApi.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -556,6 +606,17 @@ namespace OshikatsuApi.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OshikatsuApi.Entities.TalentSource", b =>
+                {
+                    b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
+                        .WithMany()
+                        .HasForeignKey("TalentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Talent");
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.UserOshi", b =>

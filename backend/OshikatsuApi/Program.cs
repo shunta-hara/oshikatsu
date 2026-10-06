@@ -133,6 +133,9 @@ builder.Services.AddScoped<IPushNotificationService, PushNotificationService>();
 // DB 使用量取得サービス（FEAT-053）
 builder.Services.AddScoped<IDbSizeService, DbSizeService>();
 
+// タレントソース管理サービス（FEAT-048）
+builder.Services.AddScoped<ITalentSourceService, TalentSourceService>();
+
 // collector 内部API認証フィルター（ServiceFilter で DI 経由で使う）
 builder.Services.AddScoped<ApiKeyAuthFilter>();
 

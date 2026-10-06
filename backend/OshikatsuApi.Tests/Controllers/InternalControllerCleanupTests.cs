@@ -14,6 +14,7 @@ public class InternalControllerCleanupTests
     private readonly IInternalCollectorService _collectorService;
     private readonly ICollectorJobLogService _jobLogService;
     private readonly INewsCleanupService _cleanupService;
+    private readonly ITalentSourceService _talentSourceService;
     private readonly InternalController _sut;
 
     public InternalControllerCleanupTests()
@@ -21,7 +22,8 @@ public class InternalControllerCleanupTests
         _collectorService = Substitute.For<IInternalCollectorService>();
         _jobLogService = Substitute.For<ICollectorJobLogService>();
         _cleanupService = Substitute.For<INewsCleanupService>();
-        _sut = new InternalController(_collectorService, _jobLogService, _cleanupService);
+        _talentSourceService = Substitute.For<ITalentSourceService>();
+        _sut = new InternalController(_collectorService, _jobLogService, _cleanupService, _talentSourceService);
     }
 
     // ── 正常系 ────────────────────────────────────────────────────────────────

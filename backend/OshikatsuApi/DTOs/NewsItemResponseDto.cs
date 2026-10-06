@@ -27,4 +27,7 @@ public class NewsItemResponseDto
 
     /// <summary>まとめた他媒体のリンク一覧（FEAT-035）。</summary>
     public IReadOnlyList<OtherSourceDto> OtherSources { get; set; } = [];
+
+    /// <summary>ソースタイプ（FEAT-048）。"youtube" 等。通常のニュース記事は null。</summary>
+    public string? SourceType { get; set; }
 }

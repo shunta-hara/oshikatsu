@@ -137,6 +137,7 @@ public class FeedService : IFeedService
                 CollectedAt = n.CollectedAt,
                 IsBookmarked = isBookmarked,
                 SourceName = sourceName,
+                SourceType = n.SourceType,
                 OtherSourceCount = g.Others.Count,
                 OtherSources = g.Others.Select(o => new OtherSourceDto
                 {

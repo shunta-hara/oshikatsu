@@ -37,6 +37,9 @@ public class NewsItem
     /// <summary>媒体名（例: スポニチ Sponichi Annex）。collector が RSS から抽出する。任意。</summary>
     public string? SourceName { get; set; }
 
+    /// <summary>ソースタイプ（"youtube" 等）。通常のニュース記事は null。</summary>
+    public string? SourceType { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 
     // Navigation

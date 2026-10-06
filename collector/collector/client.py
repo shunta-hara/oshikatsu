@@ -29,6 +29,17 @@ class OshiInfo:
 
 
 @dataclass
+class TalentSourceInfo:
+    """タレントソース情報（backend 内部 API から取得）"""
+
+    id: int
+    talent_id: int
+    source_type: str
+    source_id: str
+    is_enabled: bool
+
+
+@dataclass
 class BatchResult:
     """一括登録 API のレスポンス"""
 
@@ -47,6 +58,7 @@ class NewsBatchItem:
     summary: str | None = None
     published_at: datetime | None = None
     source_name: str | None = None
+    source_type: str | None = None
 
 
 @dataclass
@@ -76,6 +88,59 @@ class BackendClient:
                 "Content-Type": "application/json",
             }
         )
+
+    def get_talent_sources(self, *, source_type: str | None = None) -> list[TalentSourceInfo]:
+        """
+        タレントソース一覧を backend 内部 API から取得する。
+
+        source_type が指定された場合はそのタイプのみを返す（クライアント側フィルタ）。
+        is_enabled が False のエントリはスキップする。
+        不正なデータ形式のアイテムはスキップする。
+        """
+        raw: Any = self._get_with_retry("/api/v1/internal/talent-sources")
+
+        if not isinstance(raw, list):
+            logger.warning("Unexpected response format from /api/v1/internal/talent-sources: %r", raw)
+            return []
+
+        result: list[TalentSourceInfo] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                logger.warning("Unexpected talent source item format: %r", item)
+                continue
+            source_id_val = item.get("id")
+            talent_id = item.get("talentId")
+            stype = item.get("sourceType")
+            sid = item.get("sourceId")
+            is_enabled = item.get("isEnabled", True)
+            if (
+                not isinstance(source_id_val, int)
+                or not isinstance(talent_id, int)
+                or not isinstance(stype, str)
+                or not isinstance(sid, str)
+            ):
+                logger.warning(
+                    "Malformed talent source data (id=%r, talentId=%r, sourceType=%r), skipping.",
+                    source_id_val,
+                    talent_id,
+                    stype,
+                )
+                continue
+            if not is_enabled:
+                continue
+            if source_type is not None and stype != source_type:
+                continue
+            result.append(
+                TalentSourceInfo(
+                    id=source_id_val,
+                    talent_id=talent_id,
+                    source_type=stype,
+                    source_id=sid,
+                    is_enabled=is_enabled,
+                )
+            )
+
+        return result
 
     def get_oshis(self) -> list[OshiInfo]:
         """
@@ -158,6 +223,8 @@ class BackendClient:
                 entry["publishedAt"] = _to_iso(item.published_at)
             if item.source_name is not None:
                 entry["sourceName"] = item.source_name
+            if item.source_type is not None:
+                entry["sourceType"] = item.source_type
             items_payload.append(entry)
 
         payload: dict[str, Any] = {"talentId": talent_id, "items": items_payload}
