@@ -14,4 +14,7 @@ public class PushNotifyResponseDto
 
     /// <summary>410 Gone で削除した購読数</summary>
     public int GoneRemovedCount { get; set; }
+
+    /// <summary>収集失敗警告 Push を送信した購読数</summary>
+    public int WarningSentCount { get; set; }
 }

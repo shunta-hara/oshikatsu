@@ -6,6 +6,7 @@ using OshikatsuApi.Data;
 using OshikatsuApi.Entities;
 using OshikatsuApi.Services;
 using Xunit;
+using System.Collections.Generic;
 
 namespace OshikatsuApi.Tests.Services;
 
@@ -22,10 +23,22 @@ public class PushNotificationServiceTests
         return new AppDbContext(options);
     }
 
-    private static PushNotificationService CreateSut(AppDbContext db, IWebPushClient? pushClient = null)
+    private static ICollectorJobLogService CreateNoAlertJobLogService()
+    {
+        var svc = Substitute.For<ICollectorJobLogService>();
+        svc.GetActiveFailureAlertsAsync()
+           .Returns(new FailureAlertSummary(false, Array.Empty<FailingTalentInfo>()));
+        return svc;
+    }
+
+    private static PushNotificationService CreateSut(
+        AppDbContext db,
+        IWebPushClient? pushClient = null,
+        ICollectorJobLogService? jobLogService = null)
     {
         pushClient ??= Substitute.For<IWebPushClient>();
-        return new PushNotificationService(db, pushClient, NullLogger<PushNotificationService>.Instance);
+        jobLogService ??= CreateNoAlertJobLogService();
+        return new PushNotificationService(db, pushClient, jobLogService, NullLogger<PushNotificationService>.Instance);
     }
 
     private static User CreateUser(AppDbContext db)
@@ -470,5 +483,140 @@ public class PushNotificationServiceTests
         Assert.NotNull(capturedPayload);
         Assert.Contains("タレントA", capturedPayload);
         Assert.Contains("タレントB", capturedPayload);
+    }
+
+    // ── 警告 Push（FEAT-052）─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task NotifyAllUsersAsync_OverallJobFailing_SendsWarningPushToAllSubscriptions()
+    {
+        using var db = CreateDb();
+        var user1 = CreateUser(db);
+        var user2 = CreateUser(db);
+        AddSubscription(db, user1, endpoint: "https://fcm.example.com/sub1");
+        AddSubscription(db, user2, endpoint: "https://fcm.example.com/sub2");
+
+        var jobLogService = Substitute.For<ICollectorJobLogService>();
+        jobLogService.GetActiveFailureAlertsAsync()
+            .Returns(new FailureAlertSummary(true, Array.Empty<FailingTalentInfo>()));
+
+        var pushClient = Substitute.For<IWebPushClient>();
+        var sut = CreateSut(db, pushClient, jobLogService);
+
+        var result = await sut.NotifyAllUsersAsync();
+
+        Assert.Equal(2, result.WarningSentCount);
+        await pushClient.Received(2).SendNotificationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task NotifyAllUsersAsync_OverallJobFailing_WarningPayloadContainsFailureMessage()
+    {
+        using var db = CreateDb();
+        var user = CreateUser(db);
+        AddSubscription(db, user);
+
+        var jobLogService = Substitute.For<ICollectorJobLogService>();
+        jobLogService.GetActiveFailureAlertsAsync()
+            .Returns(new FailureAlertSummary(true, Array.Empty<FailingTalentInfo>()));
+
+        string? capturedPayload = null;
+        var pushClient = Substitute.For<IWebPushClient>();
+        pushClient
+            .SendNotificationAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Do<string>(p => capturedPayload = p),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut(db, pushClient, jobLogService);
+        await sut.NotifyAllUsersAsync();
+
+        Assert.NotNull(capturedPayload);
+        Assert.Contains("収集エラー", capturedPayload);
+        Assert.Contains("連続して失敗", capturedPayload);
+    }
+
+    [Fact]
+    public async Task NotifyAllUsersAsync_FailingTalent_WarningPayloadContainsTalentName()
+    {
+        using var db = CreateDb();
+        var user = CreateUser(db);
+        AddSubscription(db, user);
+
+        var failingTalents = new List<FailingTalentInfo>
+        {
+            new FailingTalentInfo(1, "山田花子"),
+        };
+        var jobLogService = Substitute.For<ICollectorJobLogService>();
+        jobLogService.GetActiveFailureAlertsAsync()
+            .Returns(new FailureAlertSummary(false, failingTalents));
+
+        string? capturedPayload = null;
+        var pushClient = Substitute.For<IWebPushClient>();
+        pushClient
+            .SendNotificationAsync(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Do<string>(p => capturedPayload = p),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut(db, pushClient, jobLogService);
+        await sut.NotifyAllUsersAsync();
+
+        Assert.NotNull(capturedPayload);
+        Assert.Contains("山田花子", capturedPayload);
+        Assert.Contains("連続して失敗", capturedPayload);
+    }
+
+    [Fact]
+    public async Task NotifyAllUsersAsync_NoAlerts_DoesNotSendWarning()
+    {
+        using var db = CreateDb();
+        var user = CreateUser(db);
+        var talent = CreateTalent(db);
+        AttachTalentToUser(db, user, talent);
+        AddSubscription(db, user, lastNotifiedAt: DateTimeOffset.UtcNow);
+        // 新着なし
+
+        // デフォルトのモック = アラートなし
+        var pushClient = Substitute.For<IWebPushClient>();
+        var sut = CreateSut(db, pushClient);
+
+        var result = await sut.NotifyAllUsersAsync();
+
+        Assert.Equal(0, result.WarningSentCount);
+        await pushClient.DidNotReceiveWithAnyArgs()
+            .SendNotificationAsync(default!, default!, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task NotifyAllUsersAsync_WarningAndNewItems_BothSent()
+    {
+        // 警告 Push（全体失敗）と通常の新着 Push を同時に送信する
+        using var db = CreateDb();
+        var user = CreateUser(db);
+        var talent = CreateTalent(db, "テストタレント");
+        AttachTalentToUser(db, user, talent);
+        AddSubscription(db, user, lastNotifiedAt: DateTimeOffset.UtcNow.AddHours(-2));
+        AddNewsItem(db, talent, collectedAt: DateTimeOffset.UtcNow.AddMinutes(-10));
+
+        var jobLogService = Substitute.For<ICollectorJobLogService>();
+        jobLogService.GetActiveFailureAlertsAsync()
+            .Returns(new FailureAlertSummary(true, Array.Empty<FailingTalentInfo>()));
+
+        var pushClient = Substitute.For<IWebPushClient>();
+        var sut = CreateSut(db, pushClient, jobLogService);
+
+        var result = await sut.NotifyAllUsersAsync();
+
+        // 警告 Push 1件 + 通常 Push 1件 = 合計 2回送信
+        await pushClient.Received(2).SendNotificationAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        Assert.Equal(1, result.WarningSentCount);
+        Assert.Equal(1, result.SuccessCount);
     }
 }

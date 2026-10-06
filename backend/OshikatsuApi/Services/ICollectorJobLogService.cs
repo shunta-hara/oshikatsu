@@ -2,6 +2,18 @@ using OshikatsuApi.DTOs;
 
 namespace OshikatsuApi.Services;
 
+/// <summary>収集失敗アラートの対象タレント情報</summary>
+/// <param name="TalentId">タレントID</param>
+/// <param name="TalentName">タレント表示名</param>
+public record FailingTalentInfo(int TalentId, string TalentName);
+
+/// <summary>収集失敗アラートのサマリ（連続3サイクル失敗が初めて検知された場合のみ非空）</summary>
+/// <param name="IsOverallJobFailing">全体ジョブ（talent_id=null）が3サイクル連続失敗中（かつ4回目以降でない）</param>
+/// <param name="FailingTalents">3サイクル連続失敗中のタレント一覧</param>
+public record FailureAlertSummary(
+    bool IsOverallJobFailing,
+    IReadOnlyList<FailingTalentInfo> FailingTalents);
+
 /// <summary>collector バッチのジョブ実行ログを管理するサービス</summary>
 public interface ICollectorJobLogService
 {
@@ -13,4 +25,11 @@ public interface ICollectorJobLogService
 
     /// <summary>各ジョブタイプの最新実行状況を返す</summary>
     Task<CollectorStatusResponseDto> GetStatusAsync();
+
+    /// <summary>
+    /// 現在アクティブな収集失敗アラートを返す。
+    /// 「アクティブ」= 直近3サイクルがすべて失敗かつ4サイクル目が失敗でない（初回検知）。
+    /// 警告送信後にさらに連続失敗が続く場合は重複送信しない。
+    /// </summary>
+    Task<FailureAlertSummary> GetActiveFailureAlertsAsync();
 }

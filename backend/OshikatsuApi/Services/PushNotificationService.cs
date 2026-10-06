@@ -7,10 +7,11 @@ using OshikatsuApi.Data;
 namespace OshikatsuApi.Services;
 
 /// <summary>
-/// 全ユーザーへの Web Push 通知送信ジョブ実装（FEAT-045）。
+/// 全ユーザーへの Web Push 通知送信ジョブ実装（FEAT-045/FEAT-052）。
 /// <para>
 /// 直近の通知送信以降に収集された新着ニュース・出演情報があるユーザーを検出し、
 /// タレント名と新着件数を含む Push 通知を送信する。
+/// 収集失敗が3サイクル連続した場合は警告 Push を全購読者へ送信する（重複送信なし）。
 /// 410 Gone の endpoint は自動削除する。
 /// 送信失敗（410 Gone 以外）は最大 3 回リトライ（指数バックオフ）する。
 /// </para>
@@ -21,15 +22,18 @@ public class PushNotificationService : IPushNotificationService
 
     private readonly AppDbContext _db;
     private readonly IWebPushClient _webPushClient;
+    private readonly ICollectorJobLogService _jobLogService;
     private readonly ILogger<PushNotificationService> _logger;
 
     public PushNotificationService(
         AppDbContext db,
         IWebPushClient webPushClient,
+        ICollectorJobLogService jobLogService,
         ILogger<PushNotificationService> logger)
     {
         _db = db;
         _webPushClient = webPushClient;
+        _jobLogService = jobLogService;
         _logger = logger;
     }
 
@@ -40,6 +44,42 @@ public class PushNotificationService : IPushNotificationService
         int failureCount = 0;
         int skipCount = 0;
         int goneRemovedCount = 0;
+        int warningSentCount = 0;
+
+        // ── 収集失敗警告チェック（FEAT-052）─────────────────────────────────
+        // 3サイクル連続失敗（初回検知のみ）の場合、全購読者へ警告 Push を送信する
+        var alerts = await _jobLogService.GetActiveFailureAlertsAsync();
+        if (alerts.IsOverallJobFailing || alerts.FailingTalents.Count > 0)
+        {
+            var warningPayload = BuildWarningPayload(alerts);
+            var allSubscriptions = await _db.PushSubscriptions.ToListAsync(cancellationToken);
+
+            _logger.LogWarning(
+                "収集失敗アラート検知: 全体失敗={Overall}, 失敗タレント数={TalentCount}。{SubCount} 件の購読へ警告 Push を送信します。",
+                alerts.IsOverallJobFailing, alerts.FailingTalents.Count, allSubscriptions.Count);
+
+            foreach (var sub in allSubscriptions)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var sendResult = await SendWithRetryAsync(sub.Endpoint, sub.P256dh, sub.Auth, warningPayload, cancellationToken);
+                switch (sendResult)
+                {
+                    case SendResult.Success:
+                        warningSentCount++;
+                        break;
+                    case SendResult.Gone:
+                        goneRemovedCount++;
+                        break;
+                    case SendResult.Failure:
+                        failureCount++;
+                        break;
+                }
+            }
+
+            _logger.LogInformation(
+                "警告 Push 送信完了: 成功={WarningSent}, Gone削除={Gone}",
+                warningSentCount, goneRemovedCount);
+        }
 
         // 購読を持つ全ユーザー ID を取得
         var userIds = await _db.PushSubscriptions
@@ -108,10 +148,13 @@ public class PushNotificationService : IPushNotificationService
         }
 
         _logger.LogInformation(
-            "Push 通知ジョブ完了: 成功={Success}, 失敗={Failure}, スキップ={Skip}, Gone削除={Gone}",
-            successCount, failureCount, skipCount, goneRemovedCount);
+            "Push 通知ジョブ完了: 成功={Success}, 失敗={Failure}, スキップ={Skip}, Gone削除={Gone}, 警告送信={Warning}",
+            successCount, failureCount, skipCount, goneRemovedCount, warningSentCount);
 
-        return new PushNotifyResult(successCount, failureCount, skipCount, goneRemovedCount);
+        return new PushNotifyResult(successCount, failureCount, skipCount, goneRemovedCount)
+        {
+            WarningSentCount = warningSentCount,
+        };
     }
 
     // ── プライベートヘルパー ─────────────────────────────────────────────────────
@@ -177,6 +220,35 @@ public class PushNotificationService : IPushNotificationService
     {
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
     };
+
+    /// <summary>
+    /// 収集失敗警告ペイロード JSON を生成する（FEAT-052）。
+    /// 例: { "title": "収集エラーのお知らせ", "body": "山田花子の収集が連続して失敗しています（3サイクル連続）" }
+    /// </summary>
+    private static string BuildWarningPayload(FailureAlertSummary alerts)
+    {
+        string body;
+        if (alerts.IsOverallJobFailing && alerts.FailingTalents.Count > 0)
+        {
+            var talentNames = string.Join("、", alerts.FailingTalents.Select(t => t.TalentName));
+            body = $"情報収集と{talentNames}の収集が連続して失敗しています（3サイクル連続）。確認をお願いします。";
+        }
+        else if (alerts.IsOverallJobFailing)
+        {
+            body = "情報収集が連続して失敗しています（3サイクル連続）。確認をお願いします。";
+        }
+        else
+        {
+            var talentNames = string.Join("、", alerts.FailingTalents.Select(t => t.TalentName));
+            body = $"{talentNames}の収集が連続して失敗しています（3サイクル連続）。";
+        }
+
+        return JsonSerializer.Serialize(new
+        {
+            title = "収集エラーのお知らせ",
+            body,
+        }, JsonOptions);
+    }
 
     /// <summary>
     /// 通知ペイロード JSON を生成する。

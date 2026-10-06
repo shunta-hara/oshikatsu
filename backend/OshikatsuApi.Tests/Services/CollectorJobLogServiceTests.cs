@@ -242,6 +242,199 @@ public class CollectorJobLogServiceTests : IDisposable
         Assert.Equal(10, result.LatestNewsJob!.SuccessCount);
     }
 
+    // ── RecordJobLogAsync: 新規フィールド（FEAT-052）────────────────────────
+
+    [Fact]
+    public async Task RecordJobLogAsync_WithFailureReason_SavesReason()
+    {
+        var dto = BuildDto(jobType: "news", successCount: 0, failureCount: 2);
+        dto.FailureReason = "network_error";
+        dto.ErrorMessage = "Connection timeout after 30s";
+        dto.TalentId = null;
+
+        var result = await _sut.RecordJobLogAsync(dto);
+
+        Assert.Equal("network_error", result.FailureReason);
+        Assert.Equal("Connection timeout after 30s", result.ErrorMessage);
+        Assert.Null(result.TalentId);
+    }
+
+    [Fact]
+    public async Task RecordJobLogAsync_WithTalentId_SavesTalentId()
+    {
+        // タレントを事前作成
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "山田花子",
+            NormalizedName = "山田花子",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var dto = BuildDto(jobType: "news", successCount: 0, failureCount: 1);
+        dto.TalentId = talent.Id;
+
+        var result = await _sut.RecordJobLogAsync(dto);
+
+        Assert.Equal(talent.Id, result.TalentId);
+    }
+
+    [Fact]
+    public async Task RecordJobLogAsync_NullOptionalFields_SavesNulls()
+    {
+        var dto = BuildDto(jobType: "news", successCount: 5, failureCount: 0);
+        // FailureReason, ErrorMessage, TalentId はデフォルト null
+
+        var result = await _sut.RecordJobLogAsync(dto);
+
+        Assert.Null(result.FailureReason);
+        Assert.Null(result.ErrorMessage);
+        Assert.Null(result.TalentId);
+    }
+
+    // ── GetActiveFailureAlertsAsync: 正常系 ─────────────────────────────────
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_NoLogs_ReturnsNoAlerts()
+    {
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+        Assert.Empty(result.FailingTalents);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_ThreeConsecutiveOverallFailures_ReturnsOverallAlert()
+    {
+        // 全体ジョブ（talent_id = null）が3回連続失敗
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 2, talentId: null);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 3, talentId: null);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.True(result.IsOverallJobFailing);
+        Assert.Empty(result.FailingTalents);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_FourConsecutiveOverallFailures_ReturnsNoAlertDuplicateSuppressed()
+    {
+        // 4連続失敗 = すでに3回目で送信済み → 重複しない
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-4), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: null);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_SuccessAfterThreeFailures_NoAlert()
+    {
+        // 成功が挟まった場合はアラートなし
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-4), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-3), successCount: 5, failureCount: 0, talentId: null); // 成功
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: null);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_ThreeConsecutiveTalentFailures_ReturnsTalentAlert()
+    {
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "佐藤太郎",
+            NormalizedName = "佐藤太郎",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: talent.Id);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+        Assert.Single(result.FailingTalents);
+        Assert.Equal(talent.Id, result.FailingTalents[0].TalentId);
+        Assert.Equal("佐藤太郎", result.FailingTalents[0].TalentName);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_FourConsecutiveTalentFailures_NoTalentAlert()
+    {
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "田中花子",
+            NormalizedName = "田中花子",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-4), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: talent.Id);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.Empty(result.FailingTalents);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_TalentSuccessAfterThreeFailures_AlertReset()
+    {
+        // 成功後に再び3連続失敗 → 新しいアラートが発生する
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "田中次郎",
+            NormalizedName = "田中次郎",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        // 4番目は成功（3連続失敗の前に成功があった = 新しい3連続）
+        await AddLog("news", now.AddHours(-4), successCount: 5, failureCount: 0, talentId: talent.Id); // 成功
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: talent.Id);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.Single(result.FailingTalents);
+        Assert.Equal(talent.Id, result.FailingTalents[0].TalentId);
+    }
+
+    [Fact]
+    public async Task GetActiveFailureAlertsAsync_TwoFailures_NoAlert()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: null);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: null);
+
+        var result = await _sut.GetActiveFailureAlertsAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private static CreateJobLogRequestDto BuildDto(
@@ -259,7 +452,8 @@ public class CollectorJobLogServiceTests : IDisposable
         string jobType,
         DateTimeOffset executedAt,
         int successCount,
-        int failureCount)
+        int failureCount,
+        int? talentId = null)
     {
         var log = new CollectorJobLog
         {
@@ -267,6 +461,7 @@ public class CollectorJobLogServiceTests : IDisposable
             ExecutedAt = executedAt,
             SuccessCount = successCount,
             FailureCount = failureCount,
+            TalentId = talentId,
             CreatedAt = DateTimeOffset.UtcNow,
         };
         _db.CollectorJobLogs.Add(log);

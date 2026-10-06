@@ -15,4 +15,8 @@ public interface IPushNotificationService
 /// <param name="FailureCount">Push 送信失敗した購読数（410 Gone 削除を除く）</param>
 /// <param name="SkipCount">新着なしでスキップしたユーザー数</param>
 /// <param name="GoneRemovedCount">410 Gone で削除した購読数</param>
-public record PushNotifyResult(int SuccessCount, int FailureCount, int SkipCount, int GoneRemovedCount);
+public record PushNotifyResult(int SuccessCount, int FailureCount, int SkipCount, int GoneRemovedCount)
+{
+    /// <summary>収集失敗警告 Push を送信した購読数</summary>
+    public int WarningSentCount { get; init; } = 0;
+}

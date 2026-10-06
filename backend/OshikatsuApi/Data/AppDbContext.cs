@@ -216,10 +216,22 @@ public class AppDbContext : DbContext
             entity.Property(e => e.ExecutedAt).HasColumnName("executed_at");
             entity.Property(e => e.SuccessCount).HasColumnName("success_count");
             entity.Property(e => e.FailureCount).HasColumnName("failure_count");
+            entity.Property(e => e.FailureReason).HasColumnName("failure_reason");
+            entity.Property(e => e.ErrorMessage).HasColumnName("error_message");
+            entity.Property(e => e.TalentId).HasColumnName("talent_id");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+
+            entity.HasOne(e => e.Talent)
+                  .WithMany()
+                  .HasForeignKey(e => e.TalentId)
+                  .OnDelete(DeleteBehavior.SetNull)
+                  .IsRequired(false);
 
             entity.HasIndex(e => new { e.JobType, e.ExecutedAt })
                   .HasDatabaseName("ix_collector_job_logs_job_type_executed_at");
+
+            entity.HasIndex(e => e.TalentId)
+                  .HasDatabaseName("ix_collector_job_logs_talent_id");
         });
 
         // ─── Bookmark ─────────────────────────────────────────────────────────

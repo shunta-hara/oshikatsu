@@ -30,6 +30,9 @@ public class CollectorJobLogService : ICollectorJobLogService
             ExecutedAt = dto.ExecutedAt.ToUniversalTime(),
             SuccessCount = dto.SuccessCount,
             FailureCount = dto.FailureCount,
+            FailureReason = dto.FailureReason,
+            ErrorMessage = dto.ErrorMessage,
+            TalentId = dto.TalentId,
             CreatedAt = now,
         };
 
@@ -81,6 +84,64 @@ public class CollectorJobLogService : ICollectorJobLogService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<FailureAlertSummary> GetActiveFailureAlertsAsync()
+    {
+        // 全体ジョブ（talent_id IS NULL）の連続失敗チェック
+        var overallRecent = await _db.CollectorJobLogs
+            .Where(l => !l.TalentId.HasValue)
+            .OrderByDescending(l => l.ExecutedAt)
+            .Take(4)
+            .ToListAsync();
+
+        bool isOverallFailing = IsThirdConsecutiveFailure(overallRecent);
+
+        // タレント別の連続失敗チェック
+        var talentIds = await _db.CollectorJobLogs
+            .Where(l => l.TalentId.HasValue)
+            .Select(l => l.TalentId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var failingTalents = new List<FailingTalentInfo>();
+        foreach (var talentId in talentIds)
+        {
+            var talentRecent = await _db.CollectorJobLogs
+                .Where(l => l.TalentId == talentId)
+                .OrderByDescending(l => l.ExecutedAt)
+                .Take(4)
+                .ToListAsync();
+
+            if (IsThirdConsecutiveFailure(talentRecent))
+            {
+                var talent = await _db.Talents.FindAsync(talentId);
+                if (talent is not null)
+                    failingTalents.Add(new FailingTalentInfo(talentId, talent.DisplayName));
+            }
+        }
+
+        return new FailureAlertSummary(isOverallFailing, failingTalents);
+    }
+
+    // ── プライベートヘルパー ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// 直近4件のログから「ちょうど3回目の連続失敗」を検知する。
+    /// <list type="bullet">
+    ///   <item>直近3件がすべて FailureCount &gt; 0</item>
+    ///   <item>かつ4件目が存在しないか FailureCount == 0（= 初回検知）</item>
+    /// </list>
+    /// 4件目も失敗の場合は「既に3回目で警告済み」とみなして false を返す（重複送信防止）。
+    /// </summary>
+    private static bool IsThirdConsecutiveFailure(List<CollectorJobLog> recent4)
+    {
+        if (recent4.Count < 3) return false;
+        if (!recent4.Take(3).All(l => l.FailureCount > 0)) return false;
+        // 4件目が存在しないか成功 = 今回初めて3連続失敗に到達
+        if (recent4.Count >= 4 && recent4[3].FailureCount > 0) return false;
+        return true;
+    }
+
     private static JobLogResponseDto MapToDto(CollectorJobLog log) => new()
     {
         Id = log.Id,
@@ -88,6 +149,9 @@ public class CollectorJobLogService : ICollectorJobLogService
         ExecutedAt = log.ExecutedAt,
         SuccessCount = log.SuccessCount,
         FailureCount = log.FailureCount,
+        FailureReason = log.FailureReason,
+        ErrorMessage = log.ErrorMessage,
+        TalentId = log.TalentId,
         CreatedAt = log.CreatedAt,
     };
 }

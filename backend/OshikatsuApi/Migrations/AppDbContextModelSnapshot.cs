@@ -71,6 +71,10 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text")
+                        .HasColumnName("error_message");
+
                     b.Property<DateTimeOffset>("ExecutedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("executed_at");
@@ -78,6 +82,10 @@ namespace OshikatsuApi.Migrations
                     b.Property<int>("FailureCount")
                         .HasColumnType("integer")
                         .HasColumnName("failure_count");
+
+                    b.Property<string>("FailureReason")
+                        .HasColumnType("text")
+                        .HasColumnName("failure_reason");
 
                     b.Property<string>("JobType")
                         .IsRequired()
@@ -89,7 +97,14 @@ namespace OshikatsuApi.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("success_count");
 
+                    b.Property<int?>("TalentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("talent_id");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("TalentId")
+                        .HasDatabaseName("ix_collector_job_logs_talent_id");
 
                     b.HasIndex("JobType", "ExecutedAt")
                         .HasDatabaseName("ix_collector_job_logs_job_type_executed_at");
@@ -475,6 +490,16 @@ namespace OshikatsuApi.Migrations
                     b.Navigation("NewsItem");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OshikatsuApi.Entities.CollectorJobLog", b =>
+                {
+                    b.HasOne("OshikatsuApi.Entities.Talent", "Talent")
+                        .WithMany()
+                        .HasForeignKey("TalentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Talent");
                 });
 
             modelBuilder.Entity("OshikatsuApi.Entities.NewsItem", b =>

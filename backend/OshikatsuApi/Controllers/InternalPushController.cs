@@ -49,6 +49,7 @@ public class InternalPushController : ControllerBase
             FailureCount = result.FailureCount,
             SkipCount = result.SkipCount,
             GoneRemovedCount = result.GoneRemovedCount,
+            WarningSentCount = result.WarningSentCount,
         });
     }
 }
