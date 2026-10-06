@@ -8,12 +8,15 @@ import sys
 
 from collector.client import BackendClient
 from collector.config import load_config
+from collector.event_collector import run_event_collection
 from collector.health_wait import wait_for_backend
 from collector.logger import get_logger, setup_logging
 from collector.news_collector import run_news_collection
 from collector.news_fetcher import NewsFetcher
 from collector.program_collector import run_program_collection
 from collector.program_fetcher import ProgramFetcher
+from collector.rss_fetcher import RssFetcher
+from collector.x_collector import run_x_collection
 from collector.youtube_collector import YouTubeFetcher, run_youtube_collection
 
 
@@ -105,6 +108,40 @@ def main() -> None:
         logger.info(
             "YOUTUBE_API_KEY が未設定です。YouTube 収集をスキップします。"
         )
+
+    # RSS フェッチャー（X 収集・イベント収集で共用）
+    rss_fetcher = RssFetcher(
+        timeout=config.request_timeout_seconds,
+        max_retries=config.max_retries,
+        access_interval=1.0,
+    )
+
+    # X RSS 収集（X_RSS_BASE_URL が設定されている場合のみ）
+    if config.x_rss_base_url:
+        try:
+            x_sources = client.get_talent_sources(source_type="x_post")
+        except Exception as exc:
+            logger.error("X RSS ソース一覧の取得に失敗しました: %s", exc)
+            x_sources = []
+
+        if config.talent_id is not None:
+            x_sources = [s for s in x_sources if s.talent_id == config.talent_id]
+
+        run_x_collection(client, rss_fetcher, x_sources, config.x_rss_base_url)
+    else:
+        logger.info("X_RSS_BASE_URL が未設定です。X 収集をスキップします。")
+
+    # イベント RSS 収集
+    try:
+        event_sources = client.get_talent_sources(source_type="event")
+    except Exception as exc:
+        logger.error("イベント RSS ソース一覧の取得に失敗しました: %s", exc)
+        event_sources = []
+
+    if config.talent_id is not None:
+        event_sources = [s for s in event_sources if s.talent_id == config.talent_id]
+
+    run_event_collection(client, rss_fetcher, event_sources)
 
     logger.info("Collector finished")
 

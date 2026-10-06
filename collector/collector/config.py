@@ -20,6 +20,9 @@ class CollectorConfig:
         self.talent_id: int | None = self._parse_optional_int("TALENT_ID")
         # YouTube Data API v3 キー（未設定時は YouTube 収集をスキップ）
         self.youtube_api_key: str | None = self._parse_optional_str("YOUTUBE_API_KEY")
+        # X 公開 RSS プロキシのベース URL（未設定時は X 収集をスキップ）
+        # 既定 URL はコードに埋め込まない（nitter 系は不安定・規約上グレーのため）
+        self.x_rss_base_url: str | None = self._parse_optional_str("X_RSS_BASE_URL")
 
     @staticmethod
     def _require(key: str) -> str:
