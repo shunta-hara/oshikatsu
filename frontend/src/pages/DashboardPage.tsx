@@ -13,6 +13,7 @@ import { TvGuideLinks } from "../components/feed/TvGuideLinks";
 import { OshiFilter } from "../components/feed/OshiFilter";
 import { NotificationBadge } from "../components/feed/NotificationBadge";
 import { CollectorStatus } from "../components/collector/CollectorStatus";
+import { CollectorOperationsPanel } from "../components/collector/CollectorOperationsPanel";
 import { OshiCardList } from "../components/dashboard/OshiCardList";
 import { PushNotificationButton } from "../components/push/PushNotificationButton";
 import type { OshiResponse } from "../types/oshi";
@@ -204,6 +205,16 @@ export function DashboardPage() {
                 収集ジョブ状況
               </h2>
               <CollectorStatus />
+            </section>
+
+            <section
+              className="section-card"
+              aria-labelledby="operations-section-title"
+            >
+              <h2 id="operations-section-title" className="section-card__title">
+                運用パネル
+              </h2>
+              <CollectorOperationsPanel />
             </section>
           </aside>
 

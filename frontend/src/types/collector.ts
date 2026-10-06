@@ -7,6 +7,9 @@ export const jobLogResponseSchema = z.object({
   executedAt: z.string().datetime({ offset: true }),
   successCount: z.number().int(),
   failureCount: z.number().int(),
+  failureReason: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  talentId: z.number().int().nullable().optional(),
   createdAt: z.string().datetime({ offset: true }),
 });
 
@@ -20,4 +23,24 @@ export const collectorStatusResponseSchema = z.object({
 
 export type CollectorStatusResponse = z.infer<
   typeof collectorStatusResponseSchema
+>;
+
+/** 連続失敗中のタレント情報（GET /api/v1/collector/operations） */
+export const failingTalentStatusSchema = z.object({
+  talentId: z.number().int(),
+  talentName: z.string(),
+  consecutiveFailureCount: z.number().int(),
+});
+
+export type FailingTalentStatus = z.infer<typeof failingTalentStatusSchema>;
+
+/** GET /api/v1/collector/operations のレスポンス */
+export const collectorOperationsResponseSchema = z.object({
+  recentJobs: z.array(jobLogResponseSchema),
+  isOverallJobFailing: z.boolean(),
+  failingTalents: z.array(failingTalentStatusSchema),
+});
+
+export type CollectorOperationsResponse = z.infer<
+  typeof collectorOperationsResponseSchema
 >;

@@ -435,6 +435,151 @@ public class CollectorJobLogServiceTests : IDisposable
         Assert.False(result.IsOverallJobFailing);
     }
 
+    // ── GetOperationsDataAsync: 正常系 ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetOperationsDataAsync_NoLogs_ReturnsEmpty()
+    {
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.NotNull(result);
+        Assert.Empty(result.RecentJobs);
+        Assert.False(result.IsOverallJobFailing);
+        Assert.Empty(result.FailingTalents);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_RecentJobsWithin24h_ReturnsThem()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-1), successCount: 5, failureCount: 0);
+        await AddLog("program", now.AddHours(-2), successCount: 3, failureCount: 1);
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.Equal(2, result.RecentJobs.Count);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_OldJobsBeyond24h_ExcludesThem()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-25), successCount: 5, failureCount: 0); // 24h超過
+        await AddLog("news", now.AddHours(-1), successCount: 3, failureCount: 0);  // 24h以内
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.Single(result.RecentJobs);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_OverallJobFailing_SetsIsOverallJobFailing()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 2, talentId: null);
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.True(result.IsOverallJobFailing);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_OverallJobSucceeded_IsOverallJobFailingFalse()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-1), successCount: 5, failureCount: 0, talentId: null);
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.False(result.IsOverallJobFailing);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_TalentWithConsecutiveFailures_ReturnsFailingTalent()
+    {
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "テスト推し",
+            NormalizedName = "テスト推し",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 2, talentId: talent.Id);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: talent.Id);
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.Single(result.FailingTalents);
+        Assert.Equal(talent.Id, result.FailingTalents[0].TalentId);
+        Assert.Equal("テスト推し", result.FailingTalents[0].TalentName);
+        Assert.Equal(3, result.FailingTalents[0].ConsecutiveFailureCount);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_TalentWithSuccessAfterFailures_NotInFailingList()
+    {
+        var talent = new OshikatsuApi.Entities.Talent
+        {
+            DisplayName = "成功した推し",
+            NormalizedName = "成功した推し",
+            CreatedAt = DateTime.UtcNow,
+        };
+        _db.Talents.Add(talent);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: talent.Id); // 失敗
+        await AddLog("news", now.AddHours(-1), successCount: 5, failureCount: 0, talentId: talent.Id); // 最新は成功
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.Empty(result.FailingTalents);
+    }
+
+    // ── GetOperationsDataAsync: 境界値 ──────────────────────────────────────
+
+    [Fact]
+    public async Task GetOperationsDataAsync_MultipleTalents_SortedByConsecutiveCountDesc()
+    {
+        var talent1 = new OshikatsuApi.Entities.Talent { DisplayName = "推し1", NormalizedName = "推し1", CreatedAt = DateTime.UtcNow };
+        var talent2 = new OshikatsuApi.Entities.Talent { DisplayName = "推し2", NormalizedName = "推し2", CreatedAt = DateTime.UtcNow };
+        _db.Talents.AddRange(talent1, talent2);
+        await _db.SaveChangesAsync();
+
+        var now = DateTimeOffset.UtcNow;
+        // talent1: 1回連続失敗
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 1, talentId: talent1.Id);
+        // talent2: 3回連続失敗
+        await AddLog("news", now.AddHours(-3), successCount: 0, failureCount: 1, talentId: talent2.Id);
+        await AddLog("news", now.AddHours(-2), successCount: 0, failureCount: 1, talentId: talent2.Id);
+        await AddLog("news", now.AddHours(-1), successCount: 0, failureCount: 2, talentId: talent2.Id);
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.Equal(2, result.FailingTalents.Count);
+        // 降順: talent2（3回）が先
+        Assert.Equal(talent2.Id, result.FailingTalents[0].TalentId);
+        Assert.Equal(3, result.FailingTalents[0].ConsecutiveFailureCount);
+        Assert.Equal(talent1.Id, result.FailingTalents[1].TalentId);
+        Assert.Equal(1, result.FailingTalents[1].ConsecutiveFailureCount);
+    }
+
+    [Fact]
+    public async Task GetOperationsDataAsync_RecentJobsSortedNewestFirst()
+    {
+        var now = DateTimeOffset.UtcNow;
+        await AddLog("news", now.AddHours(-3), successCount: 1, failureCount: 0);
+        await AddLog("news", now.AddHours(-1), successCount: 5, failureCount: 0); // 最新
+
+        var result = await _sut.GetOperationsDataAsync();
+
+        Assert.True(result.RecentJobs[0].ExecutedAt > result.RecentJobs[1].ExecutedAt);
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private static CreateJobLogRequestDto BuildDto(

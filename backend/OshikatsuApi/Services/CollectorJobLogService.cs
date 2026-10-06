@@ -123,6 +123,74 @@ public class CollectorJobLogService : ICollectorJobLogService
         return new FailureAlertSummary(isOverallFailing, failingTalents);
     }
 
+    /// <inheritdoc />
+    public async Task<CollectorOperationsResponseDto> GetOperationsDataAsync()
+    {
+        var since = DateTimeOffset.UtcNow.AddHours(-24);
+
+        // 直近24時間のジョブ一覧（最新順、最大50件）
+        var recentJobs = await _db.CollectorJobLogs
+            .Where(l => l.ExecutedAt >= since)
+            .OrderByDescending(l => l.ExecutedAt)
+            .Take(50)
+            .ToListAsync();
+
+        // 全体ジョブ（TalentId IS NULL）が現在失敗中かどうか
+        var latestOverall = await _db.CollectorJobLogs
+            .Where(l => !l.TalentId.HasValue)
+            .OrderByDescending(l => l.ExecutedAt)
+            .FirstOrDefaultAsync();
+        var isOverallFailing = latestOverall != null && latestOverall.FailureCount > 0;
+
+        // タレント別連続失敗カウント
+        var talentIds = await _db.CollectorJobLogs
+            .Where(l => l.TalentId.HasValue)
+            .Select(l => l.TalentId!.Value)
+            .Distinct()
+            .ToListAsync();
+
+        var failingTalents = new List<FailingTalentStatusDto>();
+        foreach (var talentId in talentIds)
+        {
+            var logs = await _db.CollectorJobLogs
+                .Where(l => l.TalentId == talentId)
+                .OrderByDescending(l => l.ExecutedAt)
+                .Take(20)
+                .ToListAsync();
+
+            var consecutiveCount = 0;
+            foreach (var log in logs)
+            {
+                if (log.FailureCount > 0) consecutiveCount++;
+                else break;
+            }
+
+            if (consecutiveCount > 0)
+            {
+                var talent = await _db.Talents.FindAsync(talentId);
+                if (talent is not null)
+                {
+                    failingTalents.Add(new FailingTalentStatusDto
+                    {
+                        TalentId = talentId,
+                        TalentName = talent.DisplayName,
+                        ConsecutiveFailureCount = consecutiveCount,
+                    });
+                }
+            }
+        }
+
+        // 連続失敗回数の降順でソート
+        failingTalents.Sort((a, b) => b.ConsecutiveFailureCount.CompareTo(a.ConsecutiveFailureCount));
+
+        return new CollectorOperationsResponseDto
+        {
+            RecentJobs = recentJobs.Select(MapToDto).ToList(),
+            IsOverallJobFailing = isOverallFailing,
+            FailingTalents = failingTalents,
+        };
+    }
+
     // ── プライベートヘルパー ─────────────────────────────────────────────────
 
     /// <summary>

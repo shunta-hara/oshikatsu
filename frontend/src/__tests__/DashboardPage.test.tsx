@@ -24,6 +24,9 @@ const mockGetPrograms = vi.mocked(feedApi.getPrograms);
 const mockGetUnreadCount = vi.mocked(feedApi.getUnreadCount);
 const mockMarkAsRead = vi.mocked(feedApi.markAsRead);
 const mockGetCollectorStatus = vi.mocked(collectorApi.getCollectorStatus);
+const mockGetCollectorOperations = vi.mocked(
+  collectorApi.getCollectorOperations,
+);
 const mockGetDashboardSummary = vi.mocked(dashboardApi.getDashboardSummary);
 
 const emptyNewsPage = {
@@ -73,6 +76,12 @@ describe("DashboardPage", () => {
     mockGetCollectorStatus.mockResolvedValue({
       latestNewsJob: null,
       latestProgramJob: null,
+    });
+    // デフォルトで運用パネル空データを返す
+    mockGetCollectorOperations.mockResolvedValue({
+      recentJobs: [],
+      isOverallJobFailing: false,
+      failingTalents: [],
     });
     // デフォルトで未読件数 0、mark-as-read は成功
     mockGetUnreadCount.mockResolvedValue(0);

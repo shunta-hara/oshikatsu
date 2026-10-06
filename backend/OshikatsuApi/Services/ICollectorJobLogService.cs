@@ -32,4 +32,14 @@ public interface ICollectorJobLogService
     /// 警告送信後にさらに連続失敗が続く場合は重複送信しない。
     /// </summary>
     Task<FailureAlertSummary> GetActiveFailureAlertsAsync();
+
+    /// <summary>
+    /// 運用パネル向けデータを返す。
+    /// <list type="bullet">
+    ///   <item>直近24時間のジョブ実行一覧（最新順・最大50件）</item>
+    ///   <item>全体収集ジョブが現在失敗中かどうか</item>
+    ///   <item>タレント別の現在連続失敗状況（連続失敗回数の降順）</item>
+    /// </list>
+    /// </summary>
+    Task<CollectorOperationsResponseDto> GetOperationsDataAsync();
 }

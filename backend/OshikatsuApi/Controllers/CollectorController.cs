@@ -29,4 +29,16 @@ public class CollectorController : ControllerBase
         var result = await _jobLogService.GetStatusAsync();
         return Ok(result);
     }
+
+    /// <summary>直近24時間のジョブ実行履歴と失敗中タレントを返す（運用パネル向け）</summary>
+    /// <response code="200">運用パネルデータ</response>
+    /// <response code="401">未認証</response>
+    [HttpGet("operations")]
+    [ProducesResponseType(typeof(CollectorOperationsResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetOperations()
+    {
+        var result = await _jobLogService.GetOperationsDataAsync();
+        return Ok(result);
+    }
 }

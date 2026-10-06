@@ -122,6 +122,90 @@ public class CollectorControllerTests
         Assert.Null(body.LatestProgramJob);
     }
 
+    // ── GET /api/v1/collector/operations: 正常系 ─────────────────────────────
+
+    [Fact]
+    public async Task GetOperations_AuthenticatedUser_Returns200()
+    {
+        _jobLogService.GetOperationsDataAsync().Returns(EmptyOperations());
+
+        var result = await _sut.GetOperations();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOperations_NoRecentJobs_ReturnsEmptyCollections()
+    {
+        _jobLogService.GetOperationsDataAsync().Returns(EmptyOperations());
+
+        var result = await _sut.GetOperations();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<CollectorOperationsResponseDto>(ok.Value);
+        Assert.Empty(body.RecentJobs);
+        Assert.Empty(body.FailingTalents);
+        Assert.False(body.IsOverallJobFailing);
+    }
+
+    [Fact]
+    public async Task GetOperations_WithRecentJobs_ReturnsJobs()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var ops = new CollectorOperationsResponseDto
+        {
+            RecentJobs = new List<JobLogResponseDto>
+            {
+                new() { Id = 1, JobType = "news", ExecutedAt = now.AddHours(-1), SuccessCount = 5, FailureCount = 0, CreatedAt = now.AddHours(-1) },
+                new() { Id = 2, JobType = "program", ExecutedAt = now.AddHours(-2), SuccessCount = 3, FailureCount = 1, CreatedAt = now.AddHours(-2) },
+            },
+            IsOverallJobFailing = false,
+            FailingTalents = [],
+        };
+        _jobLogService.GetOperationsDataAsync().Returns(ops);
+
+        var result = await _sut.GetOperations();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<CollectorOperationsResponseDto>(ok.Value);
+        Assert.Equal(2, body.RecentJobs.Count);
+    }
+
+    [Fact]
+    public async Task GetOperations_WithFailingTalents_ReturnsFailingTalents()
+    {
+        var ops = new CollectorOperationsResponseDto
+        {
+            RecentJobs = [],
+            IsOverallJobFailing = true,
+            FailingTalents = new List<FailingTalentStatusDto>
+            {
+                new() { TalentId = 1, TalentName = "推しA", ConsecutiveFailureCount = 3 },
+            },
+        };
+        _jobLogService.GetOperationsDataAsync().Returns(ops);
+
+        var result = await _sut.GetOperations();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var body = Assert.IsType<CollectorOperationsResponseDto>(ok.Value);
+        Assert.True(body.IsOverallJobFailing);
+        Assert.Single(body.FailingTalents);
+        Assert.Equal("推しA", body.FailingTalents[0].TalentName);
+        Assert.Equal(3, body.FailingTalents[0].ConsecutiveFailureCount);
+    }
+
+    [Fact]
+    public async Task GetOperations_CallsServiceOnce()
+    {
+        _jobLogService.GetOperationsDataAsync().Returns(EmptyOperations());
+
+        await _sut.GetOperations();
+
+        await _jobLogService.Received(1).GetOperationsDataAsync();
+    }
+
     // ── ヘルパー ─────────────────────────────────────────────────────────────
 
     private void SetupAuthenticatedUser(int userId)
@@ -139,5 +223,12 @@ public class CollectorControllerTests
     {
         LatestNewsJob = null,
         LatestProgramJob = null,
+    };
+
+    private static CollectorOperationsResponseDto EmptyOperations() => new()
+    {
+        RecentJobs = [],
+        IsOverallJobFailing = false,
+        FailingTalents = [],
     };
 }
