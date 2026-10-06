@@ -43,5 +43,8 @@ jobs:
           BACKEND_BASE_URL: ${{ secrets.BACKEND_BASE_URL }}
           COLLECTOR_API_KEY: ${{ secrets.COLLECTOR_API_KEY }}
           TALENT_ID: ${{ inputs.talent_id }}
+          # 未登録（空）の場合、collector は YouTube / X の収集をスキップする
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          X_RSS_BASE_URL: ${{ secrets.X_RSS_BASE_URL }}
         run: python -m collector
         working-directory: collector
